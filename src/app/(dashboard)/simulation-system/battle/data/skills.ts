@@ -3,7 +3,7 @@
  * 战斗系统技能数据（30个确定性技能）
  */
 
-import { Skill, SkillId, ELEMENT_CONFIG } from '../types';
+import { Skill, SkillId, type Element } from '../types';
 
 // 技能数据
 export const SKILLS: Record<SkillId, Skill> = {
@@ -572,30 +572,41 @@ export const SKILLS: Record<SkillId, Skill> = {
   },
 };
 
-// 获取所有技能列表
-export const getAllSkills = (): Skill[] => Object.values(SKILLS);
+/** 内置 30 技能列表 */
+export function getBuiltinSkills(): Skill[] {
+  return Object.values(SKILLS);
+}
 
-// 按元素分类获取技能
-export const getSkillsByElement = (element?: string): Skill[] => {
-  if (!element || element === 'all') {
-    return getAllSkills();
-  }
-  
-  if (element === 'none') {
-    // 普攻
-    return getAllSkills().filter(s => 
-      [SkillId.PUGONG_MENGJI, SkillId.PUGONG_YUANSU_CHUOCI, SkillId.PUGONG_XUHOU_ZAN].includes(s.id as SkillId)
-    );
-  }
-  
-  const prefix = element === 'fire' ? 'huo_' :
-                 element === 'water' ? 'shui_' :
-                 element === 'thunder' ? 'lei_' :
-                 element === 'grass' ? 'cao_' :
-                 element === 'ice' ? 'bing_' : '';
-  
-  return getAllSkills().filter(s => s.id.startsWith(prefix));
-};
+/** 与历史代码兼容 */
+export const getAllSkills = getBuiltinSkills;
+
+/**
+ * 元素筛选标签：优先看附着元素；random 与无附着则回退到 id 前缀（兼容内置 id）
+ */
+export function inferSkillTabElement(skill: Skill): Element | 'none' {
+  const ae = skill.attachElement;
+  if (ae?.element && ae.element !== 'random') return ae.element;
+  if (ae?.element === 'random') return 'none';
+  const id = skill.id;
+  if (id.startsWith('pugong')) return 'none';
+  if (id.startsWith('huo_')) return 'fire';
+  if (id.startsWith('shui_')) return 'water';
+  if (id.startsWith('lei_')) return 'thunder';
+  if (id.startsWith('cao_')) return 'grass';
+  if (id.startsWith('bing_')) return 'ice';
+  return 'none';
+}
+
+export function filterSkillsByTab(skills: Skill[], tab: string): Skill[] {
+  if (!tab || tab === 'all') return skills;
+  if (tab === 'none') return skills.filter((s) => inferSkillTabElement(s) === 'none');
+  return skills.filter((s) => inferSkillTabElement(s) === tab);
+}
+
+/** 仅内置技能上的元素筛选（导出脚本等仍可用） */
+export function getSkillsByElement(element?: string): Skill[] {
+  return filterSkillsByTab(getBuiltinSkills(), element || 'all');
+}
 
 // 获取普攻列表
 export const getNormalAttacks = (): Skill[] => {
@@ -606,11 +617,11 @@ export const getNormalAttacks = (): Skill[] => {
   ];
 };
 
-// 元素对应的技能
+// 元素对应的技能（内置）
 export const ELEMENT_SKILLS: Record<string, Skill[]> = {
-  fire: getSkillsByElement('fire'),
-  water: getSkillsByElement('water'),
-  thunder: getSkillsByElement('thunder'),
-  grass: getSkillsByElement('grass'),
-  ice: getSkillsByElement('ice'),
+  fire: filterSkillsByTab(getBuiltinSkills(), 'fire'),
+  water: filterSkillsByTab(getBuiltinSkills(), 'water'),
+  thunder: filterSkillsByTab(getBuiltinSkills(), 'thunder'),
+  grass: filterSkillsByTab(getBuiltinSkills(), 'grass'),
+  ice: filterSkillsByTab(getBuiltinSkills(), 'ice'),
 };

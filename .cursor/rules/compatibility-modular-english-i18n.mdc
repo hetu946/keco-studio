@@ -1,0 +1,47 @@
+---
+description: 生成代码时对齐依赖版本与兼容性；模块化组织；注释与用户可见文案（含 msg）使用规范英语
+alwaysApply: true
+---
+
+# Version compatibility, modularity, and English copy
+
+## Version and compatibility
+
+- Before adding or changing APIs, **align with this repo’s declared stack** in `package.json` and `tsconfig.json` (e.g. Next.js App Router, React 18.x, TypeScript strict, Ant Design 5, Supabase client versions in use).
+- Prefer patterns and APIs that are **stable in the versions already pinned**; avoid bleeding-edge syntax or library APIs from majors newer than the project unless the user explicitly upgrades dependencies.
+- When touching Node-only code, respect the **Node / TypeScript target** implied by the project (do not assume unsupported runtimes).
+- If a dependency’s types or runtime differ between versions, **match existing imports and usage** in nearby files instead of guessing from generic docs.
+
+## Modular structure
+
+- **Single responsibility**: split large files by domain (hooks, services, pure logic, UI). Prefer small modules with explicit exports over “god” components or mega-util files.
+- **Clear boundaries**: keep UI, data fetching, and business rules in separate layers where the codebase already does so; reuse existing folders and naming conventions.
+- **Imports**: avoid circular dependencies; prefer dependency direction from UI toward data/services, not the reverse.
+- **Public surface**: export only what callers need; keep helpers private to the module when possible.
+
+## Comments and user-visible text (English, consistent)
+
+- **Code comments** (including `//`, `/* */`, JSDoc on non-trivial functions): write in **English**, concise and accurate; explain *why* when non-obvious, not what the syntax already says.
+- **User-visible strings** (UI labels, `message.*`, `notification`, toast, modal titles, form validation text, error strings returned to clients, `msg` / `errorMessage` fields, logging messages intended for operators): use **English**, consistent tense and capitalization (sentence case for sentences; title case only where the design system requires it).
+- For **new** comments and strings you introduce, use English. If a file already uses Chinese product copy or an i18n key scheme, **match that file’s pattern** for user-facing text; do not silently rewrite existing locale choices.
+- Match existing tone: professional, no slang, no emoji in code or messages.
+
+## Examples
+
+```typescript
+// Good: explains intent in English
+// Retry once on transient network errors from Supabase.
+```
+
+```typescript
+// Bad: vague or non-English in code-facing text
+// 这里处理一下
+```
+
+```typescript
+message.error("Failed to save changes. Please try again.");
+```
+
+---
+
+When in doubt, **read neighboring files** in the same feature area and mirror their module layout, dependency versions, and English style.

@@ -1,4 +1,3 @@
-import '@ant-design/v5-patch-for-react-19';
 import { Koulen, Roboto, Nunito } from 'next/font/google';
 import { SupabaseProvider } from '@/lib/SupabaseContext';
 import { AuthProvider } from '@/lib/contexts/AuthContext';

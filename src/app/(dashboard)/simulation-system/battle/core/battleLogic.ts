@@ -16,9 +16,7 @@ import {
   ReactionType,
   Skill,
   MP_CONFIG,
-  SkillId,
 } from '../types';
-import { SKILLS } from '../data/skills';
 
 // ==================== 工具函数 ====================
 
@@ -50,22 +48,25 @@ export const getRandomElement = (): Element => {
   return elements[Math.floor(Math.random() * elements.length)];
 };
 
+/**
+ * 攻击方附着元素 × 目标当前元素 → 触发的反应类型（与 `checkElementReaction` 一致）。
+ * 导出到 xlsx 及策划表时从此处取数，避免与实现分叉。
+ */
+export const ELEMENT_REACTION_PAIR_MAP: Record<Element, Partial<Record<Element, ReactionType>>> = {
+  fire: { water: 'vaporize', ice: 'melt', grass: 'burn' },
+  water: { fire: 'vaporize', thunder: 'electrify', ice: 'freeze' },
+  thunder: { fire: 'overload', water: 'electrify', grass: 'quicken' },
+  grass: { fire: 'burn', thunder: 'quicken' },
+  ice: { fire: 'melt', water: 'freeze' },
+};
+
 /** 检查元素反应 */
 export const checkElementReaction = (
   attackElement: Element,
   targetElement: Element | null
 ): ReactionType | null => {
   if (!targetElement) return null;
-  
-  const reactionMap: Record<string, Record<string, ReactionType>> = {
-    fire: { water: 'vaporize', ice: 'melt', grass: 'burn' },
-    water: { fire: 'vaporize', thunder: 'electrify', ice: 'freeze' },
-    thunder: { fire: 'overload', water: 'electrify', grass: 'quicken' },
-    grass: { fire: 'burn', thunder: 'quicken' },
-    ice: { fire: 'melt', water: 'freeze' },
-  };
-  
-  return reactionMap[attackElement]?.[targetElement] || null;
+  return ELEMENT_REACTION_PAIR_MAP[attackElement]?.[targetElement] || null;
 };
 
 /** 获取元素强度持续回合 */

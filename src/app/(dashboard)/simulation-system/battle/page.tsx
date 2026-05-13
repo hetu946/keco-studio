@@ -11,7 +11,11 @@ import {
   ELEMENT_STRENGTH_CONFIG,
   REACTION_CONFIG,
 } from './types';
-import { SKILLS, getAllSkills, getSkillsByElement } from './data/skills';
+import { filterSkillsByTab, getBuiltinSkills, inferSkillTabElement } from './data/skills';
+import {
+  BATTLE_SKILLS_UPDATED_EVENT,
+  loadBattleSkillsFromPersistence,
+} from './lib/skills/battleSkillsStorage';
 import {
   createInitialBattleState,
   canUseSkill,
@@ -26,16 +30,8 @@ import styles from './BattleSimulator.module.css';
 
 // ==================== 工具函数 ====================
 
-/** 获取技能的元素类型 */
-const getSkillElement = (skill: Skill): Element | 'none' => {
-  if (skill.id.startsWith('pugong')) return 'none';
-  if (skill.id.startsWith('huo_')) return 'fire';
-  if (skill.id.startsWith('shui_')) return 'water';
-  if (skill.id.startsWith('lei_')) return 'thunder';
-  if (skill.id.startsWith('cao_')) return 'grass';
-  if (skill.id.startsWith('bing_')) return 'ice';
-  return 'none';
-};
+/** 获取技能的元素类型（用于 UI 着色；与配表筛选一致） */
+const getSkillElement = (skill: Skill): Element | 'none' => inferSkillTabElement(skill);
 
 /** 格式化回合日志 */
 const formatLogEntry = (entry: BattleLogEntry, index: number) => {
@@ -107,39 +103,61 @@ export default function BattleSimulatorPage() {
   // 当前选中的元素标签
   const [selectedElement, setSelectedElement] = useState<string>('all');
 
-  // 玩家配置的技能列表（战前配置，最多6个）
-  const [playerSkillIds, setPlayerSkillIds] = useState<string[]>(() => {
-    // 默认选择前6个技能
-    const allSkills = getAllSkills();
-    return allSkills.slice(0, 6).map(s => s.id);
-  });
+  // 当前生效技能列表（内置或本机配表）
+  const [skillList, setSkillList] = useState<Skill[]>(() => getBuiltinSkills());
+
+  // 玩家配置的技能列表（战前配置，最多6个）；首包后由 skillList 与 loadBattleSkillsFromPersistence 同步
+  const [playerSkillIds, setPlayerSkillIds] = useState<string[]>([]);
 
   // 日志滚动引用
   const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      void loadBattleSkillsFromPersistence().then(setSkillList);
+    };
+    sync();
+    if (typeof window === 'undefined') return;
+    window.addEventListener(BATTLE_SKILLS_UPDATED_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(BATTLE_SKILLS_UPDATED_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPlayerSkillIds((prev) => {
+      const valid = prev.filter((id) => skillList.some((s) => s.id === id));
+      if (valid.length > 0) return valid;
+      return skillList.slice(0, Math.min(6, skillList.length)).map((s) => s.id);
+    });
+  }, [skillList]);
 
   // ==================== 计算属性 ====================
 
   // 获取玩家配置的所有技能
   const playerConfiguredSkills = useMemo(() => {
-    const allSkills = getAllSkills();
     return playerSkillIds
-      .map(id => allSkills.find(s => s.id === id))
+      .map((id) => skillList.find((s) => s.id === id))
       .filter((s): s is Skill => s !== undefined);
-  }, [playerSkillIds]);
+  }, [playerSkillIds, skillList]);
 
   // 当前显示的技能列表（根据战斗状态决定）
   const displayedSkills = useMemo(() => {
+    const byTab = (tab: string) =>
+      tab === 'all' ? skillList : filterSkillsByTab(skillList, tab);
     if (!battleState) {
-      return selectedElement === 'all' ? getAllSkills() : getSkillsByElement(selectedElement as Element);
+      return byTab(selectedElement);
     }
     if (battleState.phase === 'setup') {
-      return selectedElement === 'all' ? getAllSkills() : getSkillsByElement(selectedElement as Element);
+      return byTab(selectedElement);
     }
     if (battleState.phase === 'finished') {
       return playerConfiguredSkills;
     }
     return playerConfiguredSkills;
-  }, [selectedElement, battleState, playerConfiguredSkills]);
+  }, [selectedElement, battleState, playerConfiguredSkills, skillList]);
 
   // 战斗状态下的技能列表（带冷却状态）
   const skillsWithCooldown = useMemo(() => {
@@ -151,7 +169,7 @@ export default function BattleSimulatorPage() {
       ...skill,
       currentCooldown: battleState.skillCooldowns[skill.id] || 0,
     }));
-  }, [displayedSkills, battleState, selectedElement, playerConfiguredSkills]);
+  }, [displayedSkills, battleState]);
 
   // ==================== 处理函数 ====================
 
@@ -339,10 +357,7 @@ export default function BattleSimulatorPage() {
     }
 
     // 敌人选择技能（简化逻辑：随机选择一个可用技能）
-    const enemySkills = getAllSkills().filter(s => {
-      if (s.id.startsWith('pugong')) return true;
-      return s.mpCost <= monster.mp;
-    });
+    const enemySkills = skillList.filter((s) => s.mpCost <= monster.mp);
 
     // 优先选择有元素反应的技能
     let enemySkill: Skill | null = null;
@@ -364,7 +379,7 @@ export default function BattleSimulatorPage() {
       }
     }
 
-    if (!enemySkill) {
+    if (!enemySkill && enemySkills.length > 0) {
       // 随机选择
       enemySkill = enemySkills[Math.floor(Math.random() * Math.min(3, enemySkills.length))];
     }
@@ -407,7 +422,7 @@ export default function BattleSimulatorPage() {
     setTimeout(() => {
       handleRoundEnd(newState, player, monster);
     }, 500);
-  }, []);
+  }, [skillList]);
 
   // 回合结束处理
   const handleRoundEnd = useCallback((currentState: BattleState, currentPlayer: BattleUnit, currentMonster: BattleUnit) => {
@@ -1114,9 +1129,14 @@ export default function BattleSimulatorPage() {
             <p>元素反应 · 确定性战斗 · 策略对决</p>
           </div>
         </div>
-        <Link href="/simulation-system" className={styles.backButton}>
-          ← 返回 / Back
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Link href="/simulation-system/battle/skills" className={styles.backButton}>
+            技能配表
+          </Link>
+          <Link href="/simulation-system" className={styles.backButton}>
+            ← 返回 / Back
+          </Link>
+        </div>
       </header>
 
       {/* 主内容 */}

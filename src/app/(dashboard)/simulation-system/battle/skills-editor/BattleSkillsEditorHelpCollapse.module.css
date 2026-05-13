@@ -1,0 +1,10 @@
+/* 字段说明折叠内容 */
+
+.helpParagraph {
+  margin-bottom: 0;
+}
+
+.helpList {
+  padding-left: 18px;
+  margin: 0;
+}
