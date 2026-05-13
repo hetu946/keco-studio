@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BattleBreadcrumb } from './components/BattleBreadcrumb';
+import { BattleLayoutShell } from './components/BattleLayoutShell';
 
 export const metadata: Metadata = {
   title: '战斗模拟 / Battle Simulator - Keco Studio',
@@ -8,17 +8,11 @@ export const metadata: Metadata = {
 
 /**
  * 战斗模拟布局
- * 添加面包屑导航
  */
 export default function BattleLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <>
-      <BattleBreadcrumb />
-      {children}
-    </>
-  );
+  return <BattleLayoutShell>{children}</BattleLayoutShell>;
 }

@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
-import { Card, Badge, Tooltip } from 'antd';
+import { Card, Badge } from 'antd';
 import {
   UserOutlined,
   ShoppingOutlined,
@@ -11,6 +10,7 @@ import {
   StarOutlined,
   ExperimentOutlined,
   ThunderboltOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import styles from './SimulationSystem.module.css';
 
@@ -83,6 +83,15 @@ const BATTLE_MODULES = [
     description: 'PVE回合制战斗模拟与难度评估',
     color: '#fa541c',
   },
+  {
+    id: 'battle-skills',
+    name: '技能配表',
+    nameEn: 'Battle Skills',
+    icon: <SettingOutlined />,
+    path: '/simulation-system/battle/skills',
+    description: '在本机浏览器中编辑技能数据，供战斗模拟使用',
+    color: '#722ed1',
+  },
 ] as const;
 
 /**
@@ -107,61 +116,8 @@ export default function SimulationSystemPage() {
         </Link>
       </header>
 
-      {/* 主内容 */}
+      {/* 主内容（与主站 Sidebar 并排，不再使用页内左侧栏） */}
       <main className={styles.mainContent}>
-        {/* 侧边模块导航 */}
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarTitle}>功能模块</div>
-          <nav className={styles.moduleNav}>
-            {/* 战斗模拟 */}
-            {BATTLE_MODULES.map((module) => (
-              <Tooltip
-                key={module.id}
-                title={module.description}
-                placement="right"
-              >
-                <Link
-                  href={module.path}
-                  className={styles.moduleItem}
-                  style={{
-                    '--module-color': module.color,
-                  } as React.CSSProperties}
-                >
-                  <span className={styles.moduleIcon}>{module.icon}</span>
-                  <span className={styles.moduleText}>
-                    <span className={styles.moduleNameCn}>{module.name.split(' / ')[0]}</span>
-                    <span className={styles.moduleNameEn}>{module.nameEn}</span>
-                  </span>
-                </Link>
-              </Tooltip>
-            ))}
-
-            {/* 经济模拟 */}
-            {ECONOMY_MODULES.map((module) => (
-              <Tooltip
-                key={module.id}
-                title={module.description}
-                placement="right"
-              >
-                <Link
-                  href={module.path}
-                  className={styles.moduleItem}
-                  style={{
-                    '--module-color': module.color,
-                  } as React.CSSProperties}
-                >
-                  <span className={styles.moduleIcon}>{module.icon}</span>
-                  <span className={styles.moduleText}>
-                    <span className={styles.moduleNameCn}>{module.name.split(' / ')[0]}</span>
-                    <span className={styles.moduleNameEn}>{module.nameEn}</span>
-                  </span>
-                </Link>
-              </Tooltip>
-            ))}
-          </nav>
-        </aside>
-
-        {/* 内容区域 */}
         <section className={styles.content}>
           {/* 系统说明 */}
           <Card className={styles.introCard} variant="borderless">
@@ -198,6 +154,22 @@ export default function SimulationSystemPage() {
                 </div>
                 <div className={styles.systemCardDesc}>
                   PVE回合制战斗模拟，支持大规模批量测试，自动计算难度评级
+                </div>
+              </div>
+            </Link>
+
+            {/* 技能配表 */}
+            <Link href="/simulation-system/battle/skills" className={styles.systemCard}>
+              <div
+                className={styles.systemCardIcon}
+                style={{ backgroundColor: '#531dab' }}
+              >
+                <SettingOutlined />
+              </div>
+              <div className={styles.systemCardContent}>
+                <div className={styles.systemCardTitle}>技能配表</div>
+                <div className={styles.systemCardDesc}>
+                  在本机编辑战斗技能，战斗模拟将读取已保存的配表
                 </div>
               </div>
             </Link>

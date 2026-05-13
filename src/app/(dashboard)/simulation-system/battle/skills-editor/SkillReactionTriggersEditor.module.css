@@ -1,0 +1,18 @@
+/* 关联反应编辑器（表格内嵌） */
+
+.root {
+  width: 100%;
+  min-width: 240px;
+}
+
+.pairRow {
+  width: 100%;
+}
+
+.selectElement {
+  width: 88px;
+}
+
+.selectReaction {
+  width: 100px;
+}
