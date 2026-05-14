@@ -1,0 +1,15 @@
+---
+description: Simulation lives in keco-simulation — do not implement sim features in this repo
+alwaysApply: true
+---
+
+# Simulation app is a separate repo
+
+Battle simulators, economy simulators, **simulation-only tables**, and battle skill editors belong in the sibling project **`keco-simulation`** (typically served on port **3001**), not under `keco-studio`.
+
+In **this** repo you may keep only:
+
+- The **iframe embed** for the simulation app (`simulation-system` layout + `SimulationSystemEmbed` + `NEXT_PUBLIC_SIMULATION_*` env), and
+- Sidebar / routing that **links or iframes** into that origin.
+
+Do **not** add new simulation business logic, duplicated battle pages, or Studio-library hacks under `src/app/(dashboard)/simulation-system/` beyond that embed. See `../keco-simulation/.cursor/rules/keco-simulation-vs-keco-studio.mdc`.
