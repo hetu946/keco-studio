@@ -76,3 +76,17 @@ Seeds the remote Supabase database with test users by directly connecting to Pos
 - ❌ Requires direct database access (firewall issues)
 - ❌ More complex setup and troubleshooting
 
+---
+
+## Simulation exports (moved)
+
+Economy / battle `.xlsx` export scripts used to live here; they now run from the sibling repo **`../keco-simulation`**:
+
+```bash
+cd ../keco-simulation
+npm run export:simulation-xlsx
+npm run export:battle-simulation-xlsx
+```
+
+See `../keco-simulation/README.md` for local dev and iframe embedding from Keco.
+

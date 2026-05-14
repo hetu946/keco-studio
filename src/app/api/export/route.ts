@@ -41,21 +41,21 @@ type FieldDefinitionRow = {
   label: string;
   description: string | null;
   data_type:
-    | 'string'
-    | 'string_array'
-    | 'int'
-    | 'int_array'
-    | 'float'
-    | 'float_array'
-    | 'boolean'
-    | 'enum'
-    | 'date'
-    | 'image'
-    | 'file'
-    | 'reference'
-    | 'multimedia'
-    | 'audio'
-    | 'formula';
+  | 'string'
+  | 'string_array'
+  | 'int'
+  | 'int_array'
+  | 'float'
+  | 'float_array'
+  | 'boolean'
+  | 'enum'
+  | 'date'
+  | 'image'
+  | 'file'
+  | 'reference'
+  | 'multimedia'
+  | 'audio'
+  | 'formula';
   enum_options: string[] | null;
   reference_libraries: string[] | null;
   formula_expression: string | null;
@@ -423,9 +423,9 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const supabase = authHeader
     ? createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      })
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
     : createSupabaseServerClient(request);
   const { data: { user }, error: authError } = authHeader
     ? await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
@@ -501,12 +501,12 @@ export async function GET(request: NextRequest) {
           }
         }
         return {
-        id: row.id,
-        name: row.name,
-        propertyValues: exportPropertyValues,
-        created_at: row.created_at,
-        rowIndex: row.rowIndex,
-      };
+          id: row.id,
+          name: row.name,
+          propertyValues: exportPropertyValues,
+          created_at: row.created_at,
+          rowIndex: row.rowIndex,
+        };
       }),
     };
     const json = JSON.stringify(payload, null, 2);

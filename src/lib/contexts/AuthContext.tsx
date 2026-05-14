@@ -17,6 +17,50 @@ async function clearAllCaches() {
   }));
 }
 
+/** Stable string for logs / Next overlay (object args often render as "{}"). */
+function formatSupabaseLikeError(error: unknown): string {
+  if (error == null) {
+    return '(null/undefined)';
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (typeof error !== 'object') {
+    return String(error);
+  }
+  const obj = error as Record<string, unknown>;
+  const parts: string[] = [];
+  const msg =
+    (typeof obj.message === 'string' && obj.message) ||
+    (error instanceof Error ? error.message : '');
+  if (msg) parts.push(`message=${msg}`);
+  if (obj.code != null && String(obj.code) !== '') parts.push(`code=${String(obj.code)}`);
+  if (obj.details != null && String(obj.details) !== '') parts.push(`details=${String(obj.details)}`);
+  if (obj.hint != null && String(obj.hint) !== '') parts.push(`hint=${String(obj.hint)}`);
+  const status = obj.status ?? obj.statusCode;
+  if (typeof status === 'number' || (typeof status === 'string' && status !== '')) {
+    parts.push(`status=${String(status)}`);
+  }
+  if (parts.length > 0) {
+    return parts.join(' | ');
+  }
+  try {
+    const keys = Object.getOwnPropertyNames(obj);
+    if (keys.length > 0) {
+      return keys.map((k) => `${k}=${String(obj[k])}`).join(', ');
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    return `json=${JSON.stringify(obj)}`;
+  } catch {
+    /* ignore */
+  }
+  const s = String(error);
+  return s === '[object Object]' ? '(empty error object)' : s;
+}
+
 type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -79,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Reset currentUserId to allow retry
           currentUserId.current = null;
         } else {
-          // Only log non-PGRST116 errors (PGRST116 = no rows returned, which is expected for new users)
-          console.error('Failed to fetch profile:', error);
+          // Only log non-PGRST116 errors (PGRST116 = no rows returned, which is expected for new users).
+          console.error(`Failed to fetch profile: ${formatSupabaseLikeError(error)}`);
           // Reset currentUserId to allow retry
           currentUserId.current = null;
         }
@@ -93,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserProfile(null);
       }
     } catch (err) {
+      console.error(`Failed to fetch profile (exception): ${formatSupabaseLikeError(err)}`);
       // Reset currentUserId to allow retry
       currentUserId.current = null;
       setUserProfile(null);
