@@ -65,7 +65,8 @@ async function createSearchFixture(
 }
 
 function searchInput(page: Page): Locator {
-  return page.getByPlaceholder('Search for...');
+  // TopBar switches placeholder when "Only search cell content" tab is active.
+  return page.getByPlaceholder(/Search for\.\.\.|Find in cell values\.\.\./);
 }
 
 function searchDropdown(page: Page): Locator {
