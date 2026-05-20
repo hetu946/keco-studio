@@ -257,6 +257,238 @@
   color: #059669;
 }
 
+/* Cell search: find & replace (matches searchInput / searchTab tokens) */
+.cellReplaceRow {
+  padding: 0.4rem 0.75rem 0.55rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cellReplaceField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cellReplaceLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.cellReplaceInput {
+  width: 100%;
+  height: 2.25rem;
+  border-radius: 88px;
+  border: 1px solid #e2e8f0;
+  background-color: rgba(248, 250, 252, 0.8);
+  padding: 0 0.9rem;
+  font-size: 0.875rem;
+  color: #334155;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.cellReplaceInput::placeholder {
+  color: #94a3b8;
+}
+
+.cellReplaceInput:focus {
+  border-color: rgba(11, 153, 255, 1);
+  background-color: #ffffff;
+}
+
+.cellSearchGroup {
+  padding: 0.25rem 0.25rem 0.6rem;
+}
+
+.cellSearchGroupTitle {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.cellSearchGroupPath {
+  margin-top: 0.2rem;
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.cellSearchHitGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.cellSearchHitCard {
+  position: relative;
+  border-radius: 0.6rem;
+  background: rgba(15, 23, 42, 0.03);
+  overflow: hidden;
+  transition: background-color 0.15s ease;
+}
+
+.cellSearchHitCard:hover {
+  background: rgba(11, 153, 255, 0.06);
+}
+
+.cellSearchHitMain {
+  position: relative;
+  width: 100%;
+  display: block;
+  border: none;
+  background: transparent;
+  padding: 0.6rem 0.7rem 2rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cellSearchHitMain:hover {
+  background: transparent;
+}
+
+.cellSearchHitBody {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.cellSearchHitMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.cellSearchHitFieldLabel {
+  margin-top: 0;
+  font-size: 0.72rem;
+  padding-right: 5.2rem;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #6b7280;
+}
+
+.cellSearchHitValue {
+  width: 100%;
+  color: #0f172a;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-align: left;
+  word-break: break-all;
+}
+
+.cellSearchHitTime {
+  padding: 0.125rem 0.35rem;
+  position: absolute;
+  top: 0.55rem;
+  right: 0.65rem;
+  max-width: 5.2rem;
+  white-space: nowrap;
+}
+
+.cellReplaceOneButton {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.45rem;
+  height: 1.5rem;
+  padding: 0 0.55rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: rgba(11, 153, 255, 0.12);
+  color: rgba(11, 153, 255, 1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.cellReplaceOneButton:hover {
+  background: rgba(11, 153, 255, 1);
+  color: #ffffff;
+}
+
+.cellSearchFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+}
+
+.cellReplaceAllButton {
+  flex-shrink: 0;
+  height: 2rem;
+  padding: 0 0.85rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: #0b99ff;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cellReplaceAllButton:hover {
+  background: #0090ee;
+}
+
+.cellReplaceAllButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cellSearchPagination {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.cellSearchPaginationLabel {
+  font-size: 0.75rem;
+  color: #6b7280;
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+.cellReplacePreviewList,
+.cellReplaceSkipList {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #374151;
+}
+
+.cellReplaceSkipList {
+  color: #b45309;
+}
+
+.cellReplaceHint {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.cellSearchEmpty,
+.cellSearchLoading {
+  padding: 0.75rem 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
 .searchInput {
   width: 100%;
   height: 2.75rem;

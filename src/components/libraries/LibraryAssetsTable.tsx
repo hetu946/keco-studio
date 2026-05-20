@@ -324,7 +324,6 @@ export function LibraryAssetsTable({
   const focusSectionIdFromQuery = searchParams.get('focusSectionId');
   const focusAssetIdFromQuery = searchParams.get('focusAssetId');
   const focusFieldIdFromQuery = searchParams.get('focusFieldId');
-  const cellSearchQFromQuery = searchParams.get('cellSearchQ');
   const supabase = useSupabase();
   const {
     hoveredAssetId,
@@ -615,40 +614,14 @@ export function LibraryAssetsTable({
     sectionRenameHintStorageKey,
   ]);
 
-  // If coming from global search, allow query param to force-switch section tab.
-  useEffect(() => {
-    if (!cellSearchQFromQuery || !library?.id) {
-      setSearchHighlightedCells([]);
-      return;
-    }
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.sessionStorage.getItem(`keco-cell-search:${cellSearchQFromQuery}`);
-      if (!raw) {
-        setSearchHighlightedCells([]);
-        return;
-      }
-      const parsed = JSON.parse(raw) as Array<{
-        libraryId?: string;
-        assetId?: string;
-        fieldId?: string;
-      }>;
-      if (!Array.isArray(parsed)) {
-        setSearchHighlightedCells([]);
-        return;
-      }
-      const cells = parsed
-        .filter((h) => String(h.libraryId ?? '') === library.id)
-        .map((h) => ({
-          assetId: String(h.assetId ?? ''),
-          fieldId: String(h.fieldId ?? ''),
-        }))
-        .filter((h) => h.assetId.length > 0 && h.fieldId.length > 0);
-      setSearchHighlightedCells(cells);
-    } catch {
-      setSearchHighlightedCells([]);
-    }
-  }, [cellSearchQFromQuery, library?.id]);
+  const clearSearchCellHighlight = useCallback(() => {
+    setSearchHighlightedCells([]);
+    appliedFocusCellRef.current = null;
+    if (typeof document === 'undefined') return;
+    document
+      .querySelectorAll(`.${styles.searchCellHit}`)
+      .forEach((el) => el.classList.remove(styles.searchCellHit));
+  }, []);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -662,6 +635,22 @@ export function LibraryAssetsTable({
       el?.classList.add(styles.searchCellHit);
     });
   }, [searchHighlightedCells, activeProperties, resolvedRows]);
+
+  useEffect(() => {
+    const handleHighlightClear = () => clearSearchCellHighlight();
+    const handleCellValuesReplaced = (event: Event) => {
+      const custom = event as CustomEvent<{ libraryId?: string }>;
+      if (custom.detail?.libraryId && custom.detail.libraryId !== library?.id) return;
+      clearSearchCellHighlight();
+    };
+    if (typeof window === 'undefined') return;
+    window.addEventListener('libraryCellSearchHighlightClear', handleHighlightClear);
+    window.addEventListener('libraryCellValuesReplaced', handleCellValuesReplaced);
+    return () => {
+      window.removeEventListener('libraryCellSearchHighlightClear', handleHighlightClear);
+      window.removeEventListener('libraryCellValuesReplaced', handleCellValuesReplaced);
+    };
+  }, [clearSearchCellHighlight, library?.id]);
 
   useEffect(() => {
     if (!focusSectionIdFromQuery) return;
@@ -783,31 +772,30 @@ export function LibraryAssetsTable({
     },
   });
 
-  // If coming from global search, highlight the specific asset+field cell.
+  // From cell search: highlight only the clicked result (one cell at a time).
   useEffect(() => {
     if (!focusAssetIdFromQuery || !focusFieldIdFromQuery) {
+      setSearchHighlightedCells([]);
       appliedFocusCellRef.current = null;
       return;
     }
     if (!groups.length) return;
 
+    setSearchHighlightedCells([
+      { assetId: focusAssetIdFromQuery, fieldId: focusFieldIdFromQuery },
+    ]);
+
     const focusCellKey = `${focusAssetIdFromQuery}-${focusFieldIdFromQuery}`;
     if (appliedFocusCellRef.current === focusCellKey) return;
     appliedFocusCellRef.current = focusCellKey;
 
-    // Scroll to the cell after render.
     setTimeout(() => {
       const el = document.querySelector(
         `tr[data-row-id="${focusAssetIdFromQuery}"] td[data-property-key="${focusFieldIdFromQuery}"]`
       ) as HTMLElement | null;
       el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
     }, 0);
-  }, [
-    focusAssetIdFromQuery,
-    focusFieldIdFromQuery,
-    groups,
-    activeProperties,
-  ]);
+  }, [focusAssetIdFromQuery, focusFieldIdFromQuery, groups]);
 
   const { handleCut, handleCopy, handlePaste } = useClipboardOperations({
     dataManager,

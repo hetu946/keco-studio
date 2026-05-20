@@ -553,11 +553,15 @@
 
 .confirmDialog {
   background: #ffffff;
-  width: 38.5rem; /* 616px */
-  height: 12.75rem; /* 204px */
+  width: 38.5rem;
+  /* 616px */
+  height: 12.75rem;
+  /* 204px */
   max-width: calc(100vw - 2rem);
-  border-radius: 1rem; /* 16px */
-  border: 0.0625rem solid rgba(0, 0, 0, 0.17); /* 1px */
+  border-radius: 1rem;
+  /* 16px */
+  border: 0.0625rem solid rgba(0, 0, 0, 0.17);
+  /* 1px */
   box-shadow: none;
   padding: 0;
   box-sizing: border-box;
@@ -570,7 +574,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 3.6875rem; /* 59px */
+  height: 3.6875rem;
+  /* 59px */
   padding: 0 1rem;
   border-bottom: 0.0625rem solid #e2e8f0;
 }

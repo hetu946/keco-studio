@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const AUTH_CHECK_TIMEOUT_MS = 8000;
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -52,7 +52,7 @@ export async function middleware(request: NextRequest) {
       ]);
       user = result?.data?.user ?? null;
     } catch (err) {
-      console.warn('[middleware] Supabase auth check failed or timed out:', (err as Error)?.message);
+      console.warn('[proxy] Supabase auth check failed or timed out:', (err as Error)?.message);
       return response;
     }
 
@@ -96,7 +96,7 @@ export async function middleware(request: NextRequest) {
       }
     }
   } catch (err) {
-    console.warn('[middleware] Supabase init or auth failed:', (err as Error)?.message);
+    console.warn('[proxy] Supabase init or auth failed:', (err as Error)?.message);
     return response;
   }
 

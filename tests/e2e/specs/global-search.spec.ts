@@ -180,7 +180,7 @@ test.describe('Table Cells search', () => {
 
     if (hasResults) {
       // Verify search results exist
-      const cellResultButtons = searchDropdown(page).locator('button[class*="searchResultItem"]');
+      const cellResultButtons = searchDropdown(page).locator('button[class*="cellSearchHitMain"]');
       await expect(cellResultButtons.first()).toBeVisible({ timeout: 10000 });
 
       // Verify results contain the search keyword in the value preview
@@ -302,7 +302,7 @@ test.describe('Table Cells search', () => {
    * 2. 观察页面
    * 预期：
    * - 跳转到对应 Library 表格视图
-   * - 匹配的单元格背景黄色高亮
+   * - 仅被点击的那一格黄色高亮（同时只高亮一个）
    */
   test('Table Cells search: click result navigates and highlights cell', async ({ page }) => {
     await loginAsSeedEmpty(page);
@@ -366,7 +366,7 @@ test.describe('Table Cells search', () => {
     await page.waitForTimeout(2000);
 
     // Wait for results to appear
-    const cellResultButtons = searchDropdown(page).locator('button[class*="searchResultItem"]');
+    const cellResultButtons = searchDropdown(page).locator('button[class*="cellSearchHitMain"]');
     const resultCount = await cellResultButtons.count();
 
     // Step 3: Click on a search result
@@ -387,23 +387,16 @@ test.describe('Table Cells search', () => {
       expect(urlPathParts.length).toBeGreaterThanOrEqual(2, `Expected URL to contain projectId/libraryId path, got: ${currentUrl}`);
       expect(currentUrl).toContain(`/${projectId}/`);
 
-      // Verify search query parameters are present (cellSearchQ should be in URL)
-      // The cellSearchQ param is used by the library page to highlight cells
-      const cellSearchQ = urlObj.searchParams.get('cellSearchQ');
-
-      // Either cellSearchQ matches keyword OR focusAssetId/focusFieldId params exist for navigation
-      const hasNavigationParams = cellSearchQ !== null ||
-        (urlObj.searchParams.get('focusAssetId') !== null && urlObj.searchParams.get('focusFieldId') !== null);
-
-      expect(hasNavigationParams).toBe(true, `Expected navigation params in URL, got: ${currentUrl}`);
+      expect(urlObj.searchParams.get('focusAssetId')).not.toBeNull();
+      expect(urlObj.searchParams.get('focusFieldId')).not.toBeNull();
 
       // Wait for table to render
       await page.waitForTimeout(2000);
 
-      // Verify highlighted cell exists (yellow background)
-      // The highlighted cell has class "searchCellHit" with background #fff6cc
-      const highlightedCell = page.locator('[class*="searchCellHit"]');
-      await expect(highlightedCell.first()).toBeVisible({ timeout: 10000 });
+      // Only the clicked cell should be highlighted (one at a time)
+      const highlightedCells = page.locator('[class*="searchCellHit"]');
+      await expect(highlightedCells).toHaveCount(1, { timeout: 10000 });
+      await expect(highlightedCells.first()).toBeVisible({ timeout: 10000 });
     } else {
       // No results found - verify "No matches" message
       const noMatchesText = page.getByText('No matches.');

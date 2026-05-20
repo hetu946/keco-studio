@@ -18,20 +18,29 @@ export class AuthorizationError extends Error {
  * Get the current logged-in user ID
  * @throws {AuthorizationError} if user is not logged in
  */
-export async function getCurrentUserId(supabase: SupabaseClient): Promise<string> {
-  // Use cache to prevent duplicate auth requests
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
-  const cacheKey = 'auth:current-user-id';
-  
-  return globalRequestCache.fetch(cacheKey, async () => {
+export async function getCurrentUserId(
+  supabase: SupabaseClient,
+  explicitUserId?: string
+): Promise<string> {
+  if (explicitUserId) {
+    return explicitUserId;
+  }
+
+  const resolve = async () => {
     const { data: { user }, error } = await supabase.auth.getUser();
-    
     if (error || !user) {
       throw new AuthorizationError('User not logged in');
     }
-    
     return user.id;
-  });
+  };
+
+  // API routes / server actions: never use globalRequestCache (key is not per-session).
+  if (typeof window === 'undefined') {
+    return resolve();
+  }
+
+  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
+  return globalRequestCache.fetch('auth:current-user-id', resolve);
 }
 
 /**
@@ -627,33 +636,54 @@ export async function verifyAssetUpdatePermission(
   userId?: string
 ): Promise<void> {
   const currentUserId = userId || await getCurrentUserId(supabase);
-  
-  // Get the library that owns the asset
-  const { data: asset, error: assetError } = await supabase
-    .from('library_assets')
-    .select('library_id')
-    .eq('id', assetId)
-    .single();
-  
-  if (assetError || !asset) {
-    throw new AuthorizationError('Asset not found');
+
+  // library_assets/libraries SELECT may deny project owners without a collaborator row.
+  // Use SECURITY DEFINER RPC (same pattern as is_project_owner in RLS).
+  let projectId: string | null = null;
+
+  const { data: projectIdFromRpc, error: projectIdError } = await supabase.rpc(
+    'get_asset_project_id',
+    { p_asset_id: assetId }
+  );
+
+  if (!projectIdError && projectIdFromRpc) {
+    projectId = projectIdFromRpc;
+  } else {
+    // Fallback when migration is not applied yet (editors can read library_assets).
+    const { data: asset, error: assetError } = await supabase
+      .from('library_assets')
+      .select('library_id')
+      .eq('id', assetId)
+      .maybeSingle();
+
+    if (assetError || !asset?.library_id) {
+      throw new AuthorizationError('Asset not found');
+    }
+
+    const { data: library, error: libraryError } = await supabase
+      .from('libraries')
+      .select('project_id')
+      .eq('id', asset.library_id)
+      .maybeSingle();
+
+    if (libraryError || !library?.project_id) {
+      throw new AuthorizationError('Library not found');
+    }
+
+    projectId = library.project_id;
   }
-  
-  // Get the project that owns the library
-  const { data: library, error: libraryError } = await supabase
-    .from('libraries')
-    .select('project_id')
-    .eq('id', asset.library_id)
-    .single();
-  
-  if (libraryError || !library) {
-    throw new AuthorizationError('Library not found');
+
+  const { data: isOwner, error: ownerError } = await supabase.rpc('is_project_owner', {
+    p_project_id: projectId,
+    p_user_id: currentUserId,
+  });
+
+  if (!ownerError && Boolean(isOwner)) {
+    return;
   }
-  
-  // Get user's role in the project
-  const role = await getUserProjectRole(supabase, library.project_id, currentUserId);
-  
-  // Admin and editor can update asset, viewer cannot
+
+  const role = await getUserProjectRole(supabase, projectId, currentUserId);
+
   if (role !== 'admin' && role !== 'editor') {
     throw new AuthorizationError('Only admin and editor users can update assets');
   }

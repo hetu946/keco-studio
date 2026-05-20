@@ -361,6 +361,32 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       supabase.removeChannel(channel);
     };
   }, [libraryId, supabase, loadInitialData]);
+
+  // Global cell search replace writes via API; reload Yjs from DB so the table reflects new values.
+  useEffect(() => {
+    const handleCellValuesReplaced = (event: Event) => {
+      const customEvent = event as CustomEvent<{ libraryId?: string }>;
+      const targetLibraryId = customEvent.detail?.libraryId;
+      if (!targetLibraryId || targetLibraryId !== libraryId) return;
+      loadInitialData();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener(
+        'libraryCellValuesReplaced',
+        handleCellValuesReplaced as EventListener
+      );
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(
+          'libraryCellValuesReplaced',
+          handleCellValuesReplaced as EventListener
+        );
+      }
+    };
+  }, [libraryId, loadInitialData]);
   
   // Batch queue for cell updates - apply in one transact so UI updates at once (fixes "one by one" disappearing)
   const cellUpdateQueueRef = useRef<CellUpdateEvent[]>([]);
