@@ -193,7 +193,7 @@ export async function POST(req: Request) {
       replaceAllInCell: true,
     });
 
-    if (!result.ok) {
+    if (result.ok === false) {
       skips.push({
         assetId: target.asset_id,
         fieldId: target.field_id,
