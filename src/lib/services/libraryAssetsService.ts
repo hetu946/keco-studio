@@ -7,6 +7,7 @@ import {
 } from '@/lib/types/libraryAssets';
 import { computeFormulaValuesForRow } from '@/lib/utils/formula';
 import { getLibrary } from '@/lib/services/libraryService';
+import { syncReferencesForSourceChanges } from '@/lib/services/referenceSyncService';
 import {
   verifyLibraryAccess,
   verifyLibraryUpdatePermission,
@@ -296,7 +297,7 @@ export async function getLibrarySchema(
 }> {
   // verify library access
   await verifyLibraryAccess(supabase, libraryId);
-  
+
   const { data, error } = await supabase
     .from('library_field_definitions')
     .select('*')
@@ -614,7 +615,7 @@ export async function getLibraryAssetsWithProperties(
 ): Promise<AssetRow[]> {
   // verify library access
   await verifyLibraryAccess(supabase, libraryId);
-  
+
   const { data: assetData, error: assetError } = await supabase
     .from('library_assets')
     .select('id, library_id, name, created_at, row_index')
@@ -688,7 +689,7 @@ export async function createAsset(
 
   const formulaMeta = await getFormulaFieldMetaByLibraryId(supabase, libraryId);
   const mergedPropertyValues = mergeFormulaValuesPreservingCustom(formulaMeta, propertyValues);
-  
+
   // Step 1: Insert the asset
   const insertData: {
     library_id: string;
@@ -699,7 +700,7 @@ export async function createAsset(
     library_id: libraryId,
     name: assetName,
   };
-  
+
   // If createdAt is provided, use it to control insertion position
   if (options?.createdAt) {
     insertData.created_at = options.createdAt.toISOString();
@@ -707,7 +708,7 @@ export async function createAsset(
   if (typeof options?.rowIndex === 'number') {
     insertData.row_index = options.rowIndex;
   }
-  
+
   const { data: assetData, error: assetError } = await supabase
     .from('library_assets')
     .insert(insertData)
@@ -803,7 +804,7 @@ export async function updateAsset(
   const libraryId = await getLibraryIdByAssetId(supabase, assetId);
   const formulaMeta = await getFormulaFieldMetaByLibraryId(supabase, libraryId);
   const mergedPropertyValues = mergeFormulaValuesPreservingCustom(formulaMeta, propertyValues);
-  
+
   // Step 1: Update the asset name
   const { error: assetError } = await supabase
     .from('library_assets')
@@ -830,6 +831,15 @@ export async function updateAsset(
 
     if (valuesError) {
       throw valuesError;
+    }
+
+    const sourceChanges = Object.entries(mergedPropertyValues).map(([fieldId, value]) => ({
+      assetId,
+      fieldId,
+      valueJson: value,
+    }));
+    if (sourceChanges.length > 0) {
+      await syncReferencesForSourceChanges(supabase, sourceChanges);
     }
   }
 

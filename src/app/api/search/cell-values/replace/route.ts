@@ -7,6 +7,7 @@ import {
   type CellReplaceSkip,
 } from '@/lib/utils/cellValueReplace';
 import { verifyAssetUpdatePermission } from '@/lib/services/authorizationService';
+import { syncReferencesForSourceChanges } from '@/lib/services/referenceSyncService';
 
 type ReplaceBody = {
   find?: string;
@@ -270,6 +271,12 @@ export async function POST(req: Request) {
       allowedKeys.has(`${p.assetId}:${p.fieldId}`)
     );
 
+    const affectedLibraryIdsFromTargets = new Set(
+      targets
+        .map((t) => t.library_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    );
+
     if (!dryRun) {
       if (allowedUpserts.length === 0) {
         return NextResponse.json(
@@ -301,15 +308,27 @@ export async function POST(req: Request) {
         .from('library_assets')
         .update({ updated_at: new Date().toISOString() })
         .in('id', touchedAssetIds);
+
+      try {
+        const sourceChanges = allowedUpserts.map((row) => ({
+          assetId: row.asset_id,
+          fieldId: row.field_id,
+          valueJson: row.value_json,
+        }));
+        const refUpdates = await syncReferencesForSourceChanges(supabase, sourceChanges);
+        for (const u of refUpdates) {
+          if (u.referencingLibraryId) {
+            affectedLibraryIdsFromTargets.add(u.referencingLibraryId);
+          }
+        }
+      } catch (syncError) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[cell-values/replace] reference sync failed', syncError);
+        }
+      }
     }
 
-    const affectedLibraryIds = [
-      ...new Set(
-        targets
-          .map((t) => t.library_id)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0)
-      ),
-    ];
+    const affectedLibraryIds = [...affectedLibraryIdsFromTargets];
 
     return NextResponse.json({
       updated: finalPreviews.length,

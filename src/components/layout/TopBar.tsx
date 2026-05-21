@@ -174,6 +174,8 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
   const [cellSearchLoading, setCellSearchLoading] = useState(false);
   const [cellSearchHits, setCellSearchHits] = useState<CellSearchHit[]>([]);
   const [cellSearchPage, setCellSearchPage] = useState(1);
+  /** Bumped on refocus so cell search re-fetches after table edits while blurred. */
+  const [cellSearchRefreshKey, setCellSearchRefreshKey] = useState(0);
   const [cellReplaceText, setCellReplaceText] = useState('');
   const [cellReplaceModalOpen, setCellReplaceModalOpen] = useState(false);
   const [cellReplaceLoading, setCellReplaceLoading] = useState(false);
@@ -183,6 +185,8 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
     updated: number;
     skipped: number;
     previews: Array<{
+      assetId: string;
+      fieldId: string;
       fieldLabel: string;
       beforeDisplay: string;
       afterDisplay: string;
@@ -312,7 +316,23 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
       window.clearTimeout(t);
       controller.abort();
     };
-  }, [searchFilter, searchQuery, supabase]);
+  }, [searchFilter, searchQuery, supabase, cellSearchRefreshKey]);
+
+  // Re-run cell search when underlying assets change (e.g. user edited a cell).
+  useEffect(() => {
+    if (searchFilter !== 'cell' || searchQuery.trim().length === 0) return;
+
+    const scheduleRefresh = () => {
+      setCellSearchRefreshKey((k) => k + 1);
+    };
+
+    window.addEventListener('assetUpdated', scheduleRefresh);
+    window.addEventListener('libraryCellValuesReplaced', scheduleRefresh);
+    return () => {
+      window.removeEventListener('assetUpdated', scheduleRefresh);
+      window.removeEventListener('libraryCellValuesReplaced', scheduleRefresh);
+    };
+  }, [searchFilter, searchQuery]);
 
   // 最近 7 天内有活动的项目 / 文件夹 / Library（基于 updatedAt 或 createdAt）
   const recentResults = useMemo<SearchResult[]>(() => {
@@ -620,6 +640,8 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
         skipped: number;
         affectedLibraryIds?: string[];
         previews: Array<{
+          assetId: string;
+          fieldId: string;
           fieldLabel: string;
           beforeDisplay: string;
           afterDisplay: string;
@@ -686,12 +708,12 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
             result.skips?.length > 0
               ? result.skips
               : [
-                  {
-                    fieldLabel: cellReplacePendingHit?.fieldLabel ?? 'Cells',
-                    reason:
-                      'No cells were saved. You may lack edit permission, or values changed since preview.',
-                  },
-                ],
+                {
+                  fieldLabel: cellReplacePendingHit?.fieldLabel ?? 'Cells',
+                  reason:
+                    'No cells were saved. You may lack edit permission, or values changed since preview.',
+                },
+              ],
         });
         setCellReplaceModalOpen(true);
         return;
@@ -719,6 +741,23 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
           libraryIds.forEach((id) => {
             window.dispatchEvent(
               new CustomEvent('libraryCellValuesReplaced', { detail: { libraryId: id } })
+            );
+          });
+          const touchedAssetIds = new Set<string>();
+          (result.previews ?? []).forEach((preview) => {
+            if (preview.assetId) touchedAssetIds.add(preview.assetId);
+          });
+          (result.previews ?? []).forEach((preview) => {
+            if (!preview.assetId) return;
+            window.dispatchEvent(
+              new CustomEvent('assetUpdated', {
+                detail: { assetId: preview.assetId, fieldId: preview.fieldId },
+              })
+            );
+            window.dispatchEvent(
+              new CustomEvent('referenceSourceUpdated', {
+                detail: { assetId: preview.assetId, fieldId: preview.fieldId },
+              })
             );
           });
         }
@@ -761,11 +800,11 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
           apiSkips && apiSkips.length > 0
             ? apiSkips
             : [
-                {
-                  fieldLabel: cellReplacePendingHit?.fieldLabel ?? 'Cells',
-                  reason: message,
-                },
-              ],
+              {
+                fieldLabel: cellReplacePendingHit?.fieldLabel ?? 'Cells',
+                reason: message,
+              },
+            ],
       });
       setCellReplaceModalOpen(true);
     } finally {
@@ -1478,6 +1517,9 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
               setIsSearchFocused(true);
               // 聚焦时，如果有搜索词就展示匹配结果，否则展示最近 7 天记录
               setIsSearchDropdownOpen(true);
+              if (searchFilter === 'cell' && searchQuery.trim().length > 0) {
+                setCellSearchRefreshKey((k) => k + 1);
+              }
             }}
           />
           {searchQuery.trim().length > 0 && (
@@ -1500,7 +1542,7 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
             </div>
           )}
         </label>
-        {isSearchDropdownOpen && (filteredSearchResults.length > 0 || searchFilter === 'cell') && (
+        {isSearchDropdownOpen && (
           <div className={styles.searchDropdown}>
             <div className={styles.searchTabs}>
               {searchFilter === 'cell' ? (
@@ -1683,7 +1725,7 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
                 ) : (
                   <div className={styles.cellSearchEmpty}>No matches.</div>
                 )
-              ) : (
+              ) : filteredSearchResults.length > 0 ? (
                 filteredSearchResults.map((item) => (
                   <button
                     key={`${item.type}-${item.id}`}
@@ -1712,7 +1754,9 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
                     </span>
                   </button>
                 ))
-              )}
+              ) : searchQuery.trim().length > 0 ? (
+                <div className={styles.cellSearchEmpty}>No matches.</div>
+              ) : null}
             </div>
             {searchFilter === 'cell' && !cellSearchLoading && cellSearchHits.length > 0 && (
               <div className={styles.cellSearchFooter}>

@@ -472,8 +472,8 @@ export function AssetReferenceModal({
                       key={asset.id}
                       type="button"
                       className={`${styles.assetListRow} ${selectedAssetIdsForCurrentColumn.includes(asset.id)
-                          ? styles.assetListRowSelected
-                          : ''
+                        ? styles.assetListRowSelected
+                        : ''
                         }`}
                       onClick={() => handleAssetToggle(asset)}
                     >

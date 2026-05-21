@@ -55,10 +55,10 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
         // Check if this is a reference type field
         if (property.dataType === 'reference' && property.referenceLibraries) {
           const assetIds = normalizeReferenceValueToAssetIds(newRowData[property.key]);
-          
+
           return (
-            <td 
-              key={property.id} 
+            <td
+              key={property.id}
               className={styles.editCell}
               onMouseEnter={(e) => {
                 // Show ASSET CARD when hovering over cell with assetId
@@ -92,7 +92,7 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
             </td>
           );
         }
-        
+
         // Check if this is an image, file, multimedia, or audio type field
         if (
           property.dataType === 'image' ||
@@ -112,12 +112,12 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
             </td>
           );
         }
-        
+
         // Check if this is a boolean type field
         if (property.dataType === 'boolean') {
           const boolValue = newRowData[property.key];
           const checked = boolValue === true || boolValue === 'true' || String(boolValue).toLowerCase() === 'true';
-          
+
           return (
             <td key={property.id} className={styles.editCell}>
               <div className={styles.booleanToggle}>
@@ -133,14 +133,14 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
             </td>
           );
         }
-        
+
         // Check if this is an enum/option type field
         if (property.dataType === 'enum' && property.enumOptions && property.enumOptions.length > 0) {
           const enumSelectKey = `new-${property.key}`;
           const isOpen = openEnumSelects[enumSelectKey] || false;
           const value = newRowData[property.key];
           const display = value !== null && value !== undefined && value !== '' ? String(value) : null;
-          
+
           return (
             <td key={property.id} className={styles.editCell}>
               <div className={styles.enumSelectWrapper}>
@@ -190,11 +190,11 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
             </td>
           );
         }
-        
+
         // Determine input type and validation based on data type
         const isInt = property.dataType === 'int';
         const isFloat = property.dataType === 'float';
-        
+
         return (
           <td key={property.id} className={styles.editCell}>
             <Input
@@ -206,10 +206,10 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
                 if (isInt && value !== '') {
                   // Remove any non-digit characters except minus sign at the start
                   const cleaned = value.replace(/[^\d-]/g, '');
-                  const intValue = cleaned.startsWith('-') 
+                  const intValue = cleaned.startsWith('-')
                     ? '-' + cleaned.slice(1).replace(/-/g, '')
                     : cleaned.replace(/-/g, '');
-                  
+
                   // Only update if valid integer format
                   if (!/^-?\d*$/.test(intValue)) {
                     return; // Don't update if invalid
@@ -220,15 +220,15 @@ export const AddNewRowForm: React.FC<AddNewRowFormProps> = ({
                 else if (isFloat && value !== '') {
                   // Remove invalid characters but keep valid float format
                   const cleaned = value.replace(/[^\d.-]/g, '');
-                  const floatValue = cleaned.startsWith('-') 
+                  const floatValue = cleaned.startsWith('-')
                     ? '-' + cleaned.slice(1).replace(/-/g, '')
                     : cleaned.replace(/-/g, '');
                   // Ensure only one decimal point
                   const parts = floatValue.split('.');
-                  const finalValue = parts.length > 2 
+                  const finalValue = parts.length > 2
                     ? parts[0] + '.' + parts.slice(1).join('')
                     : floatValue;
-                  
+
                   if (!/^-?\d*\.?\d*$/.test(finalValue)) {
                     return; // Don't update if invalid
                   }
