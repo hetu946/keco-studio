@@ -179,8 +179,8 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
             ...prev,
             [property.key]:
               row.propertyValues[property.key] !== null &&
-              row.propertyValues[property.key] !== undefined &&
-              row.propertyValues[property.key] !== ''
+                row.propertyValues[property.key] !== undefined &&
+                row.propertyValues[property.key] !== ''
                 ? String(row.propertyValues[property.key])
                 : '',
           }));
@@ -525,8 +525,8 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
                   <label className={styles.detailDrawerLabel}>{property.name}</label>
                   <span className={
                     isStringType
-                    ? `${styles.detailDrawerTypeBadge} ${styles.detailDrawerTypeBadgeString}`
-                    : styles.detailDrawerTypeBadge
+                      ? `${styles.detailDrawerTypeBadge} ${styles.detailDrawerTypeBadgeString}`
+                      : styles.detailDrawerTypeBadge
                   }>
                     <Image
                       src={getFieldTypeIcon(property.dataType as any)}

@@ -5,7 +5,10 @@ import Image from 'next/image';
 import { Avatar } from 'antd';
 import type { PropertyConfig } from '@/lib/types/libraryAssets';
 import { getAssetAvatarColor, getAssetAvatarText } from '@/components/libraries/utils/libraryAssetUtils';
-import { normalizeReferenceSelections } from '@/lib/utils/referenceValue';
+import {
+  normalizeReferenceSelections,
+  resolveReferenceSelectionLabel,
+} from '@/lib/utils/referenceValue';
 import referenceAddIcon from '@/assets/images/referenceAdd.svg';
 import styles from '@/components/libraries/LibraryAssetsTable.module.css';
 
@@ -62,8 +65,11 @@ export const ReferenceField = React.memo<ReferenceFieldProps>(function Reference
   const visibleSelections = displaySelections.slice(0, 5);
   const extraCount = Math.max(0, displaySelections.length - visibleSelections.length);
 
-  const getAssetName = (selection: { assetId: string; displayValue?: string | null }) =>
-    selection.displayValue || assetNamesCache[selection.assetId] || selection.assetId;
+  const getAssetName = (selection: {
+    assetId: string;
+    fieldId?: string | null;
+    displayValue?: string | null;
+  }) => resolveReferenceSelectionLabel(selection, assetNamesCache);
 
   // Expand pill so each avatar tile (1.375rem) fits; base 3.25rem covers 1 avatar + "+" tile.
   const pillWidthStyle: React.CSSProperties | undefined =

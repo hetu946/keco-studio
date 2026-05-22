@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useSupabase } from '@/lib/SupabaseContext';
 import Image from 'next/image';
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { Avatar } from 'antd';
+import { Avatar, Modal } from 'antd';
 import { getUserAvatarColor } from '@/lib/utils/avatarColors';
 import styles from './TopBar.module.css';
 import homeMorehorizontalIcon from '@/assets/images/homeMorehorizontalIcon.svg';
@@ -26,6 +26,7 @@ import searchIcon from "@/assets/images/searchIcon.svg";
 import { useSidebarProjects } from './hooks/useSidebarProjects';
 import { useSidebarFoldersLibraries } from './hooks/useSidebarFoldersLibraries';
 import { normalizeSearchString } from '@/lib/utils/normalizeSearchString';
+import { buildNormalizedIndexMap } from '@/lib/utils/cellValueReplace';
 
 type TopBarProps = {
   breadcrumb?: string[];
@@ -173,6 +174,25 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
   const [cellSearchLoading, setCellSearchLoading] = useState(false);
   const [cellSearchHits, setCellSearchHits] = useState<CellSearchHit[]>([]);
   const [cellSearchPage, setCellSearchPage] = useState(1);
+  /** Bumped on refocus so cell search re-fetches after table edits while blurred. */
+  const [cellSearchRefreshKey, setCellSearchRefreshKey] = useState(0);
+  const [cellReplaceText, setCellReplaceText] = useState('');
+  const [cellReplaceModalOpen, setCellReplaceModalOpen] = useState(false);
+  const [cellReplaceLoading, setCellReplaceLoading] = useState(false);
+  const [cellReplacePendingMode, setCellReplacePendingMode] = useState<'single' | 'all'>('all');
+  const [cellReplacePendingHit, setCellReplacePendingHit] = useState<CellSearchHit | null>(null);
+  const [cellReplacePreview, setCellReplacePreview] = useState<{
+    updated: number;
+    skipped: number;
+    previews: Array<{
+      assetId: string;
+      fieldId: string;
+      fieldLabel: string;
+      beforeDisplay: string;
+      afterDisplay: string;
+    }>;
+    skips: Array<{ fieldLabel: string; reason: string }>;
+  } | null>(null);
 
   const cellSearchTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(cellSearchHits.length / CELL_SEARCH_PAGE_SIZE));
@@ -282,19 +302,6 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
         }));
 
         setCellSearchHits(mapped);
-        try {
-          const storeKey = `keco-cell-search:${q}`;
-          const minimal = mapped.map((h) => ({
-            projectId: h.projectId,
-            libraryId: h.libraryId,
-            assetId: h.assetId,
-            fieldId: h.fieldId,
-            sectionId: h.sectionId,
-          }));
-          window.sessionStorage.setItem(storeKey, JSON.stringify(minimal));
-        } catch {
-          // Ignore storage failures.
-        }
 
       } catch {
         if (aborted) return;
@@ -309,7 +316,23 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
       window.clearTimeout(t);
       controller.abort();
     };
-  }, [searchFilter, searchQuery, supabase]);
+  }, [searchFilter, searchQuery, supabase, cellSearchRefreshKey]);
+
+  // Re-run cell search when underlying assets change (e.g. user edited a cell).
+  useEffect(() => {
+    if (searchFilter !== 'cell' || searchQuery.trim().length === 0) return;
+
+    const scheduleRefresh = () => {
+      setCellSearchRefreshKey((k) => k + 1);
+    };
+
+    window.addEventListener('assetUpdated', scheduleRefresh);
+    window.addEventListener('libraryCellValuesReplaced', scheduleRefresh);
+    return () => {
+      window.removeEventListener('assetUpdated', scheduleRefresh);
+      window.removeEventListener('libraryCellValuesReplaced', scheduleRefresh);
+    };
+  }, [searchFilter, searchQuery]);
 
   // 最近 7 天内有活动的项目 / 文件夹 / Library（基于 updatedAt 或 createdAt）
   const recentResults = useMemo<SearchResult[]>(() => {
@@ -456,25 +479,6 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
     return `${year}-${month}-${day}`;
   };
 
-  const buildNormalizedIndexMap = (text: string) => {
-    const normalizedChars: string[] = [];
-    const indexMap: number[] = [];
-
-    for (let i = 0; i < text.length; i += 1) {
-      const ch = text[i];
-      if (ch === ' ' || ch === '_') {
-        continue;
-      }
-      normalizedChars.push(ch.toLowerCase());
-      indexMap.push(i);
-    }
-
-    return {
-      normalized: normalizedChars.join(''),
-      indexMap,
-    };
-  };
-
   const highlightMatch = (text: string | null | undefined, query: string) => {
     if (!text) return null;
     const q = query.trim();
@@ -563,22 +567,259 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
   }, []);
 
   const navigateToCellHit = (hit: CellSearchHit) => {
-    const encodedQ = encodeURIComponent(searchQuery.trim());
     const focusSectionId = hit.sectionId?.trim();
+    const focusParams = new URLSearchParams({
+      focusAssetId: hit.assetId,
+      focusFieldId: hit.fieldId,
+    });
     if (focusSectionId) {
-      router.push(
-        `/${hit.projectId}/${hit.libraryId}?focusSectionId=${encodeURIComponent(
-          focusSectionId
-        )}&focusAssetId=${encodeURIComponent(hit.assetId)}&focusFieldId=${encodeURIComponent(hit.fieldId)}&cellSearchQ=${encodedQ}`
-      );
-    } else {
-      router.push(
-        `/${hit.projectId}/${hit.libraryId}?focusAssetId=${encodeURIComponent(
-          hit.assetId
-        )}&focusFieldId=${encodeURIComponent(hit.fieldId)}&cellSearchQ=${encodedQ}`
-      );
+      focusParams.set('focusSectionId', focusSectionId);
     }
+    router.push(`/${hit.projectId}/${hit.libraryId}?${focusParams.toString()}`);
   };
+
+  const clearCellSearchFocusState = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const nextParams = new URLSearchParams(window.location.search);
+    nextParams.delete('focusSectionId');
+    nextParams.delete('focusAssetId');
+    nextParams.delete('focusFieldId');
+    nextParams.delete('cellSearchQ');
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+  }, [pathname, router]);
+
+  const runCellReplaceRequest = useCallback(
+    async (params: {
+      mode: 'single' | 'all';
+      hit?: CellSearchHit;
+      dryRun: boolean;
+    }) => {
+      const find = searchQuery.trim();
+      if (!find) {
+        throw new Error('Find text is required.');
+      }
+
+      const sessionRes = await supabase.auth.getSession();
+      const token = sessionRes.data?.session?.access_token;
+
+      const res = await fetch('/api/search/cell-values/replace', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          find,
+          replace: cellReplaceText,
+          mode: params.mode,
+          dryRun: params.dryRun,
+          ...(params.mode === 'single' && params.hit
+            ? { assetId: params.hit.assetId, fieldId: params.hit.fieldId }
+            : {}),
+        }),
+      });
+
+      const payload = await res.json();
+      if (!res.ok) {
+        const err = new Error(payload?.error ?? 'Replace failed') as Error & {
+          skips?: Array<{ fieldLabel: string; reason: string }>;
+        };
+        if (Array.isArray(payload?.skips)) {
+          err.skips = payload.skips.map(
+            (s: { fieldLabel?: string; reason?: string }) => ({
+              fieldLabel: String(s.fieldLabel ?? 'Cell'),
+              reason: String(s.reason ?? payload?.error ?? 'Replace failed'),
+            })
+          );
+        }
+        throw err;
+      }
+      return payload as {
+        updated: number;
+        skipped: number;
+        affectedLibraryIds?: string[];
+        previews: Array<{
+          assetId: string;
+          fieldId: string;
+          fieldLabel: string;
+          beforeDisplay: string;
+          afterDisplay: string;
+        }>;
+        skips?: Array<{ fieldLabel: string; reason: string }>;
+      };
+    },
+    [cellReplaceText, searchQuery, supabase]
+  );
+
+  const openCellReplaceConfirm = useCallback(
+    async (mode: 'single' | 'all', hit?: CellSearchHit) => {
+      const find = searchQuery.trim();
+      if (!find) return;
+
+      setCellReplacePendingMode(mode);
+      setCellReplacePendingHit(hit ?? null);
+      setCellReplaceLoading(true);
+      setCellReplaceModalOpen(true);
+      setCellReplacePreview(null);
+
+      try {
+        const preview = await runCellReplaceRequest({ mode, hit, dryRun: true });
+        setCellReplacePreview({
+          updated: preview.updated,
+          skipped: preview.skipped,
+          previews: preview.previews,
+          skips: preview.skips ?? [],
+        });
+      } catch (error) {
+        setCellReplacePreview({
+          updated: 0,
+          skipped: 1,
+          previews: [],
+          skips: [
+            {
+              fieldLabel: hit?.fieldLabel ?? 'Cells',
+              reason: error instanceof Error ? error.message : 'Replace preview failed',
+            },
+          ],
+        });
+      } finally {
+        setCellReplaceLoading(false);
+      }
+    },
+    [runCellReplaceRequest, searchQuery]
+  );
+
+  const confirmCellReplace = useCallback(async () => {
+    setCellReplaceLoading(true);
+    try {
+      const result = await runCellReplaceRequest({
+        mode: cellReplacePendingMode,
+        hit: cellReplacePendingHit ?? undefined,
+        dryRun: false,
+      });
+
+      if (result.updated === 0) {
+        setCellReplacePreview({
+          updated: 0,
+          skipped: result.skipped ?? cellReplacePreview?.updated ?? 1,
+          previews: [],
+          skips:
+            result.skips?.length > 0
+              ? result.skips
+              : [
+                {
+                  fieldLabel: cellReplacePendingHit?.fieldLabel ?? 'Cells',
+                  reason:
+                    'No cells were saved. You may lack edit permission, or values changed since preview.',
+                },
+              ],
+        });
+        setCellReplaceModalOpen(true);
+        return;
+      }
+
+      setCellReplaceModalOpen(false);
+      setCellReplacePreview(null);
+
+      if (result.updated > 0) {
+        clearCellSearchFocusState();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('libraryCellSearchHighlightClear'));
+        }
+
+        const libraryIds = new Set<string>(
+          (result.affectedLibraryIds ?? []).filter((id) => id.length > 0)
+        );
+        if (cellReplacePendingHit?.libraryId) {
+          libraryIds.add(cellReplacePendingHit.libraryId);
+        }
+        if (libraryIds.size === 0 && currentLibraryId) {
+          libraryIds.add(currentLibraryId);
+        }
+        if (typeof window !== 'undefined') {
+          libraryIds.forEach((id) => {
+            window.dispatchEvent(
+              new CustomEvent('libraryCellValuesReplaced', { detail: { libraryId: id } })
+            );
+          });
+          const touchedAssetIds = new Set<string>();
+          (result.previews ?? []).forEach((preview) => {
+            if (preview.assetId) touchedAssetIds.add(preview.assetId);
+          });
+          (result.previews ?? []).forEach((preview) => {
+            if (!preview.assetId) return;
+            window.dispatchEvent(
+              new CustomEvent('assetUpdated', {
+                detail: { assetId: preview.assetId, fieldId: preview.fieldId },
+              })
+            );
+            window.dispatchEvent(
+              new CustomEvent('referenceSourceUpdated', {
+                detail: { assetId: preview.assetId, fieldId: preview.fieldId },
+              })
+            );
+          });
+        }
+
+        const q = searchQuery.trim();
+        const sessionRes = await supabase.auth.getSession();
+        const token = sessionRes.data?.session?.access_token;
+        const res = await fetch(`/api/search/cell-values?q=${encodeURIComponent(q)}&limit=80`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          const results: any[] = Array.isArray(payload?.results) ? payload.results : [];
+          const mapped = results.map((r) => ({
+            projectId: String(r.project_id ?? r.projectId ?? ''),
+            libraryId: String(r.library_id ?? r.libraryId ?? ''),
+            libraryName: String(r.library_name ?? r.libraryName ?? ''),
+            assetId: String(r.asset_id ?? r.assetId ?? ''),
+            assetName: String(r.asset_name ?? r.assetName ?? ''),
+            sectionId: String(r.section_id ?? r.sectionId ?? ''),
+            fieldId: String(r.field_id ?? r.fieldId ?? ''),
+            fieldLabel: String(r.field_label ?? r.fieldLabel ?? ''),
+            valueSnippet: String(r.value_snippet ?? r.valueSnippet ?? ''),
+            assetUpdatedAt: r.asset_updated_at ?? r.assetUpdatedAt ?? null,
+          }));
+          setCellSearchHits(mapped);
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Replace failed';
+      const apiSkips =
+        error instanceof Error && 'skips' in error
+          ? (error as Error & { skips?: Array<{ fieldLabel: string; reason: string }> }).skips
+          : undefined;
+      setCellReplacePreview({
+        updated: 0,
+        skipped: apiSkips?.length ?? 1,
+        previews: [],
+        skips:
+          apiSkips && apiSkips.length > 0
+            ? apiSkips
+            : [
+              {
+                fieldLabel: cellReplacePendingHit?.fieldLabel ?? 'Cells',
+                reason: message,
+              },
+            ],
+      });
+      setCellReplaceModalOpen(true);
+    } finally {
+      setCellReplaceLoading(false);
+    }
+  }, [
+    cellReplacePendingHit,
+    cellReplacePendingMode,
+    cellReplacePreview,
+    clearCellSearchFocusState,
+    currentLibraryId,
+    runCellReplaceRequest,
+    searchQuery,
+    supabase,
+  ]);
 
   // Reset asset mode when navigating to a different asset
   useEffect(() => {
@@ -1072,25 +1313,6 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
     );
   };
 
-  const clearCellSearchFocusState = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    const nextParams = new URLSearchParams(window.location.search);
-    nextParams.delete('focusSectionId');
-    nextParams.delete('focusAssetId');
-    nextParams.delete('focusFieldId');
-    nextParams.delete('cellSearchQ');
-    const clearKeys: string[] = [];
-    for (let i = 0; i < window.sessionStorage.length; i += 1) {
-      const key = window.sessionStorage.key(i);
-      if (key && key.startsWith('keco-cell-search:')) {
-        clearKeys.push(key);
-      }
-    }
-    clearKeys.forEach((key) => window.sessionStorage.removeItem(key));
-    const nextQuery = nextParams.toString();
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
-  }, [pathname, router]);
-
   const renderRightContent = () => {
     if (isPredefine) {
       return (
@@ -1277,7 +1499,7 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
             className={`icon-24 ${styles.searchIcon}`}
           />
           <input
-            placeholder="Search for..."
+            placeholder={searchFilter === 'cell' ? 'Find in cell values...' : 'Search for...'}
             className={styles.searchInput}
             value={searchQuery}
             onChange={(e) => {
@@ -1295,6 +1517,9 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
               setIsSearchFocused(true);
               // 聚焦时，如果有搜索词就展示匹配结果，否则展示最近 7 天记录
               setIsSearchDropdownOpen(true);
+              if (searchFilter === 'cell' && searchQuery.trim().length > 0) {
+                setCellSearchRefreshKey((k) => k + 1);
+              }
             }}
           />
           {searchQuery.trim().length > 0 && (
@@ -1317,7 +1542,7 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
             </div>
           )}
         </label>
-        {isSearchDropdownOpen && (filteredSearchResults.length > 0 || searchFilter === 'cell') && (
+        {isSearchDropdownOpen && (
           <div className={styles.searchDropdown}>
             <div className={styles.searchTabs}>
               {searchFilter === 'cell' ? (
@@ -1394,104 +1619,113 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
                 </>
               )}
             </div>
+            {searchFilter === 'cell' && searchQuery.trim().length > 0 && (
+              <div className={styles.cellReplaceRow}>
+                <label className={styles.cellReplaceField}>
+                  <span className={styles.cellReplaceLabel}>Replace with</span>
+                  <input
+                    type="text"
+                    className={styles.cellReplaceInput}
+                    placeholder="Replacement text"
+                    value={cellReplaceText}
+                    onChange={(e) => setCellReplaceText(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </label>
+              </div>
+            )}
             <div className={styles.searchResultSectionLabel}>RESULT</div>
             <div className={styles.searchDropdownInner}>
               {searchFilter === 'cell' ? (
                 cellSearchLoading ? (
-                  <div style={{ padding: '0.75rem 0.5rem', color: '#6b7280' }}>Searching...</div>
+                  <div className={styles.cellSearchLoading}>Searching...</div>
                 ) : cellSearchGroups.length > 0 ? (
                   cellSearchGroups.map((group) => (
-                    <div key={group.libraryId} style={{ padding: '0.25rem 0.25rem 0.6rem 0.25rem' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    <div key={group.libraryId} className={styles.cellSearchGroup}>
+                      <div className={styles.cellSearchGroupTitle}>
                         {group.libraryName}
                         {cellSearchLibraryHierarchyMap.get(group.libraryId) ? (
-                          <div style={{ marginTop: '0.2rem', color: '#6b7280', fontWeight: 400, fontSize: '0.75rem' }}>
+                          <div className={styles.cellSearchGroupPath}>
                             {cellSearchLibraryHierarchyMap.get(group.libraryId)}
                           </div>
                         ) : null}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem' }}>
+                      <div className={styles.cellSearchHitGrid}>
                         {group.hits.map((hit) => (
-                          <button
-                            key={`${hit.assetId}-${hit.fieldLabel}-${hit.valueSnippet}`}
-                            type="button"
-                            className={styles.searchResultItem}
-                            style={{
-                              alignItems: 'stretch',
-                              justifyContent: 'flex-start',
-                              padding: '0.6rem 0.7rem',
-                              background: 'rgba(15, 23, 42, 0.03)',
-                              borderRadius: '0.6rem',
-                              position: 'relative',
-                            }}
-                            onClick={() => {
-                              setIsSearchDropdownOpen(false);
-                              setIsSearchFocused(false);
-                              navigateToCellHit(hit);
-                            }}
+                          <div
+                            key={`${hit.assetId}-${hit.fieldId}-${hit.valueSnippet}`}
+                            className={styles.cellSearchHitCard}
                           >
-                            <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.7rem', minWidth: 0 }}>
-                              <Avatar
-                                size={56}
-                                style={{
-                                  flexShrink: 0,
-                                  backgroundColor: getUserAvatarColor(hit.assetId || hit.assetName || hit.fieldId),
-                                  borderRadius: '16px',
-                                  color: '#ffffff',
-                                  fontSize: '1.8rem',
-                                  fontWeight: 500,
-                                  textTransform: 'uppercase',
-                                }}
-                              >
-                                {getCellAvatarText(hit)}
-                              </Avatar>
-                              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', width: '100%' }}>
-                                <span
-                                  className={styles.searchResultType}
+                            <button
+                              type="button"
+                              className={styles.cellSearchHitMain}
+                              onClick={() => {
+                                setIsSearchDropdownOpen(false);
+                                setIsSearchFocused(false);
+                                navigateToCellHit(hit);
+                              }}
+                            >
+                              <div className={styles.cellSearchHitBody}>
+                                <Avatar
+                                  size={56}
                                   style={{
-                                    padding: '0.125rem 0.35rem',
-                                    position: 'absolute',
-                                    top: '0.55rem',
-                                    right: '0.65rem',
-                                    maxWidth: '5.2rem',
-                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                    backgroundColor: getUserAvatarColor(
+                                      hit.assetId || hit.assetName || hit.fieldId
+                                    ),
+                                    borderRadius: '16px',
+                                    color: '#ffffff',
+                                    fontSize: '1.8rem',
+                                    fontWeight: 500,
+                                    textTransform: 'uppercase',
                                   }}
                                 >
-                                  {formatUpdatedAtLabel(hit.assetUpdatedAt)}
-                                </span>
-                                <div
-                                  className={styles.searchResultParent}
-                                  style={{
-                                    marginTop: 0,
-                                    fontSize: '0.72rem',
-                                    paddingRight: '5.2rem',
-                                    width: '100%',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                  }}
-                                  title={hit.fieldLabel}
-                                >
-                                  {hit.fieldLabel}
-                                </div>
-                                <div style={{ width: '100%', color: '#0f172a', fontSize: '0.8rem', lineHeight: 1.2, textAlign: 'left' }}>
-                                  &quot;
-                                  <span style={{ wordBreak: 'break-all' }}>
-                                    {highlightCellValue(getCellValuePreview(hit.valueSnippet), searchQuery)}
+                                  {getCellAvatarText(hit)}
+                                </Avatar>
+                                <div className={styles.cellSearchHitMeta}>
+                                  <span
+                                    className={`${styles.searchResultType} ${styles.cellSearchHitTime}`}
+                                  >
+                                    {formatUpdatedAtLabel(hit.assetUpdatedAt)}
                                   </span>
-                                  &quot;
+                                  <div
+                                    className={styles.cellSearchHitFieldLabel}
+                                    title={hit.fieldLabel}
+                                  >
+                                    {hit.fieldLabel}
+                                  </div>
+                                  <div className={styles.cellSearchHitValue}>
+                                    &quot;
+                                    {highlightCellValue(
+                                      getCellValuePreview(hit.valueSnippet),
+                                      searchQuery
+                                    )}
+                                    &quot;
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </button>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.cellReplaceOneButton}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openCellReplaceConfirm('single', hit);
+                              }}
+                            >
+                              Replace
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ padding: '0.75rem 0.5rem', color: '#6b7280' }}>No matches.</div>
+                  <div className={styles.cellSearchEmpty}>No matches.</div>
                 )
-              ) : (
+              ) : filteredSearchResults.length > 0 ? (
                 filteredSearchResults.map((item) => (
                   <button
                     key={`${item.type}-${item.id}`}
@@ -1520,37 +1754,41 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
                     </span>
                   </button>
                 ))
-              )}
+              ) : searchQuery.trim().length > 0 ? (
+                <div className={styles.cellSearchEmpty}>No matches.</div>
+              ) : null}
             </div>
             {searchFilter === 'cell' && !cellSearchLoading && cellSearchHits.length > 0 && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: '1px solid #e5e7eb',
-                  padding: '0.5rem 0.75rem',
-                }}
-              >
+              <div className={styles.cellSearchFooter}>
                 <button
                   type="button"
-                  className={styles.searchTab}
-                  onClick={() => setCellSearchPage((p) => Math.max(1, p - 1))}
-                  disabled={cellSearchPage <= 1}
+                  className={styles.cellReplaceAllButton}
+                  disabled={!searchQuery.trim()}
+                  onClick={() => openCellReplaceConfirm('all')}
                 >
-                  Prev
+                  Replace all ({cellSearchHits.length})
                 </button>
-                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {cellSearchPage} / {cellSearchTotalPages}
-                </span>
-                <button
-                  type="button"
-                  className={styles.searchTab}
-                  onClick={() => setCellSearchPage((p) => Math.min(cellSearchTotalPages, p + 1))}
-                  disabled={cellSearchPage >= cellSearchTotalPages}
-                >
-                  Next
-                </button>
+                <div className={styles.cellSearchPagination}>
+                  <button
+                    type="button"
+                    className={styles.searchTab}
+                    onClick={() => setCellSearchPage((p) => Math.max(1, p - 1))}
+                    disabled={cellSearchPage <= 1}
+                  >
+                    Prev
+                  </button>
+                  <span className={styles.cellSearchPaginationLabel}>
+                    {cellSearchPage} / {cellSearchTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.searchTab}
+                    onClick={() => setCellSearchPage((p) => Math.min(cellSearchTotalPages, p + 1))}
+                    disabled={cellSearchPage >= cellSearchTotalPages}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1598,6 +1836,63 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
           )}
         </div>
       </div>
+
+      <Modal
+        title={cellReplacePendingMode === 'all' ? 'Replace all matching cells' : 'Replace cell value'}
+        open={cellReplaceModalOpen}
+        onCancel={() => {
+          if (!cellReplaceLoading) {
+            setCellReplaceModalOpen(false);
+            setCellReplacePreview(null);
+          }
+        }}
+        onOk={confirmCellReplace}
+        okText="Confirm replace"
+        cancelText="Cancel"
+        confirmLoading={cellReplaceLoading}
+        okButtonProps={{
+          disabled:
+            cellReplaceLoading ||
+            !cellReplacePreview ||
+            cellReplacePreview.updated === 0,
+        }}
+      >
+        {cellReplaceLoading && !cellReplacePreview ? (
+          <p>Validating types...</p>
+        ) : cellReplacePreview ? (
+          <div>
+            <p>
+              Find &quot;{searchQuery.trim()}&quot; → Replace with &quot;{cellReplaceText}&quot;
+            </p>
+            <p>
+              {cellReplacePreview.updated} cell(s) will be updated, {cellReplacePreview.skipped}{' '}
+              skipped.
+            </p>
+            {cellReplacePreview.previews.length > 0 && (
+              <ul className={styles.cellReplacePreviewList}>
+                {cellReplacePreview.previews.slice(0, 5).map((item, index) => (
+                  <li key={`preview-${index}`}>
+                    <strong>{item.fieldLabel}</strong>: &quot;{item.beforeDisplay}&quot; → &quot;
+                    {item.afterDisplay}&quot;
+                  </li>
+                ))}
+              </ul>
+            )}
+            {cellReplacePreview.skips.length > 0 && (
+              <ul className={styles.cellReplaceSkipList}>
+                {cellReplacePreview.skips.slice(0, 5).map((item, index) => (
+                  <li key={`skip-${index}`}>
+                    <strong>{item.fieldLabel}</strong>: {item.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className={styles.cellReplaceHint}>
+              Only cell values are replaced (not property names). Types are validated before save.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
     </header>
   );
 }

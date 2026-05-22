@@ -476,282 +476,282 @@ export function AddColumnModal({
       role="dialog"
       aria-labelledby="add-column-title"
     >
-        <div className={styles.header}>
-          <h2 id="add-column-title" className={styles.title}>
-            ADD COLUMN
-          </h2>
-          <button
-            type="button"
-            className={styles.closeBtn}
-            onClick={handleRequestClose}
-            aria-label="Close"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-        <div className={`${styles.body} ${styles.scrollBody}`}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="add-column-name">
-              Header name<span style={{ color: '#dc2626' }}>*</span>
-            </label>
-            <Input
-              id="add-column-name"
-              ref={nameInputRef}
-              value={name}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (!value || HEADER_NAME_PATTERN.test(value)) {
-                  setName(value);
-                  setError(null);
-                } else {
-                  setError('Header name can only contain letters, numbers, and underscores.');
-                }
-              }}
-              placeholder=""
-              className={styles.input}
-              maxLength={200}
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="add-column-type">
-              Data type<span style={{ color: '#dc2626' }}>*</span>
-            </label>
-            <Select
-              id="add-column-type"
-              value={dataType ?? undefined}
-              onChange={(v) => {
-                const next = v as DataType;
-                setDataType(next);
+      <div className={styles.header}>
+        <h2 id="add-column-title" className={styles.title}>
+          ADD COLUMN
+        </h2>
+        <button
+          type="button"
+          className={styles.closeBtn}
+          onClick={handleRequestClose}
+          aria-label="Close"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <div className={`${styles.body} ${styles.scrollBody}`}>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="add-column-name">
+            Header name<span style={{ color: '#dc2626' }}>*</span>
+          </label>
+          <Input
+            id="add-column-name"
+            ref={nameInputRef}
+            value={name}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!value || HEADER_NAME_PATTERN.test(value)) {
+                setName(value);
                 setError(null);
-                if (next === 'enum') {
-                  setEnumOptions((prev) => (prev.length > 0 ? prev : ['']));
-                  setReferenceLibraries([]);
-                } else if (next === 'reference') {
-                  setReferenceLibraries([]);
-                  setEnumOptions([]);
-                } else {
-                  setEnumOptions([]);
-                  setReferenceLibraries([]);
-                }
-              }}
-              placeholder="Select type"
-              className={styles.dataTypeSelect}
-              style={{ width: '100%' }}
-              suffixIcon={
-                <svg
-                  width="12"
-                  height="7"
-                  viewBox="0 0 12 7"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M0.75 0.75L5.75 5.75L10.75 0.75"
-                    stroke="#21272A"
-                    style={{
-                      stroke: '#21272A',
-                      strokeOpacity: 1,
-                    }}
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+              } else {
+                setError('Header name can only contain letters, numbers, and underscores.');
               }
-              getPopupContainer={(node) => node.parentElement ?? document.body}
-              popupRender={(originNode) => (
-                <div className={styles.dataTypeDropdown}>
-                  <div className={styles.dataTypeSearchWrap}>
-                    <span className={styles.dataTypeSearchIcon} aria-hidden>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.35-4.35" />
-                      </svg>
-                    </span>
-                    <input
-                      ref={dataTypeSearchRef}
-                      type="text"
-                      className={styles.dataTypeSearchInput}
-                      placeholder="Search"
-                      value={dataTypeSearch}
-                      onChange={(e) => setDataTypeSearch(e.target.value)}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  {originNode}
-                </div>
-              )}
-              onOpenChange={(open) => {
-                if (!open) setDataTypeSearch('');
-                else setTimeout(() => dataTypeSearchRef.current?.focus(), 0);
-              }}
-              options={filteredFieldTypeOptions.map((opt) => ({
-                value: opt.value,
-                label: (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Image src={getFieldTypeIcon(opt.value)} alt="" width={16} height={16} className={styles.typeIcon} />
-                    {opt.label}
-                  </span>
-                ),
-              }))}
-            />
-          </div>
-          {dataType === 'formula' && (
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="add-column-formula">
-                Column value<span style={{ color: '#dc2626' }}>*</span>
-              </label>
-              <div className={styles.formulaInputWrapper}>
-                <Input
-                  id="add-column-formula"
-                  ref={formulaInputRef}
-                  value={formulaValue}
-                  onChange={(e) => setFormulaValue(e.target.value)}
-                  placeholder="INSERT EXPRESSION"
-                  className={styles.formulaInput}
-                  onSelect={(e) => {
-                    const target = e.target as HTMLInputElement;
-                    const start = target.selectionStart ?? target.value.length;
-                    const end = target.selectionEnd ?? start;
-                    setFormulaSelection({ start, end });
+            }}
+            placeholder=""
+            className={styles.input}
+            maxLength={200}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="add-column-type">
+            Data type<span style={{ color: '#dc2626' }}>*</span>
+          </label>
+          <Select
+            id="add-column-type"
+            value={dataType ?? undefined}
+            onChange={(v) => {
+              const next = v as DataType;
+              setDataType(next);
+              setError(null);
+              if (next === 'enum') {
+                setEnumOptions((prev) => (prev.length > 0 ? prev : ['']));
+                setReferenceLibraries([]);
+              } else if (next === 'reference') {
+                setReferenceLibraries([]);
+                setEnumOptions([]);
+              } else {
+                setEnumOptions([]);
+                setReferenceLibraries([]);
+              }
+            }}
+            placeholder="Select type"
+            className={styles.dataTypeSelect}
+            style={{ width: '100%' }}
+            suffixIcon={
+              <svg
+                width="12"
+                height="7"
+                viewBox="0 0 12 7"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M0.75 0.75L5.75 5.75L10.75 0.75"
+                  stroke="#21272A"
+                  style={{
+                    stroke: '#21272A',
+                    strokeOpacity: 1,
                   }}
-                  onFocus={() => setFormulaDropdownOpen(true)}
-                  onBlur={() => {
-                    
-                    setTimeout(() => setFormulaDropdownOpen(false), 120);
-                  }}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
-                {formulaDropdownOpen && (
-                  <div className={styles.formulaDropdown}>
-                    <div className={styles.formulaDropdownHeader}>INSERT OPERATOR OR FUNCTION</div>
-                    <div className={styles.formulaDropdownSectionLabel}>Operators</div>
-                    <div className={styles.formulaOperatorsRow}>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('+');
-                        }}
-                        title="Add"
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('-');
-                        }}
-                        title="Subtraction"
-                      >
-                        −
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('*');
-                        }}
-                        title="Multiplication"
-                      >
-                        *
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('/');
-                        }}
-                        title="Division"
-                      >
-                        /
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('(');
-                        }}
-                        title="Left parenthesis"
-                      >
-                        (
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor(')');
-                        }}
-                        title="Right parenthesis"
-                      >
-                        )
-                      </button>
-                      {/* Comparison operators */}
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('>');
-                        }}
-                        title="Greater than"
-                      >
-                        &gt;
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('<');
-                        }}
-                        title="Less than"
-                      >
-                        &lt;
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('>=');
-                        }}
-                        title="Greater than or equal"
-                      >
-                        ≥
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('<=');
-                        }}
-                        title="Less than or equal"
-                      >
-                        ≤
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.formulaOperatorBtn}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertFormulaTokenAtCursor('=');
-                        }}
-                        title="Equal"
-                      >
-                        =
-                      </button>
-                    </div>
-                    {/* <div className={styles.formulaDropdownSectionLabel}>Columns</div>
+              </svg>
+            }
+            getPopupContainer={(node) => node.parentElement ?? document.body}
+            popupRender={(originNode) => (
+              <div className={styles.dataTypeDropdown}>
+                <div className={styles.dataTypeSearchWrap}>
+                  <span className={styles.dataTypeSearchIcon} aria-hidden>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.35-4.35" />
+                    </svg>
+                  </span>
+                  <input
+                    ref={dataTypeSearchRef}
+                    type="text"
+                    className={styles.dataTypeSearchInput}
+                    placeholder="Search"
+                    value={dataTypeSearch}
+                    onChange={(e) => setDataTypeSearch(e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {originNode}
+              </div>
+            )}
+            onOpenChange={(open) => {
+              if (!open) setDataTypeSearch('');
+              else setTimeout(() => dataTypeSearchRef.current?.focus(), 0);
+            }}
+            options={filteredFieldTypeOptions.map((opt) => ({
+              value: opt.value,
+              label: (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Image src={getFieldTypeIcon(opt.value)} alt="" width={16} height={16} className={styles.typeIcon} />
+                  {opt.label}
+                </span>
+              ),
+            }))}
+          />
+        </div>
+        {dataType === 'formula' && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="add-column-formula">
+              Column value<span style={{ color: '#dc2626' }}>*</span>
+            </label>
+            <div className={styles.formulaInputWrapper}>
+              <Input
+                id="add-column-formula"
+                ref={formulaInputRef}
+                value={formulaValue}
+                onChange={(e) => setFormulaValue(e.target.value)}
+                placeholder="INSERT EXPRESSION"
+                className={styles.formulaInput}
+                onSelect={(e) => {
+                  const target = e.target as HTMLInputElement;
+                  const start = target.selectionStart ?? target.value.length;
+                  const end = target.selectionEnd ?? start;
+                  setFormulaSelection({ start, end });
+                }}
+                onFocus={() => setFormulaDropdownOpen(true)}
+                onBlur={() => {
+
+                  setTimeout(() => setFormulaDropdownOpen(false), 120);
+                }}
+              />
+              {formulaDropdownOpen && (
+                <div className={styles.formulaDropdown}>
+                  <div className={styles.formulaDropdownHeader}>INSERT OPERATOR OR FUNCTION</div>
+                  <div className={styles.formulaDropdownSectionLabel}>Operators</div>
+                  <div className={styles.formulaOperatorsRow}>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('+');
+                      }}
+                      title="Add"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('-');
+                      }}
+                      title="Subtraction"
+                    >
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('*');
+                      }}
+                      title="Multiplication"
+                    >
+                      *
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('/');
+                      }}
+                      title="Division"
+                    >
+                      /
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('(');
+                      }}
+                      title="Left parenthesis"
+                    >
+                      (
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor(')');
+                      }}
+                      title="Right parenthesis"
+                    >
+                      )
+                    </button>
+                    {/* Comparison operators */}
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('>');
+                      }}
+                      title="Greater than"
+                    >
+                      &gt;
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('<');
+                      }}
+                      title="Less than"
+                    >
+                      &lt;
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('>=');
+                      }}
+                      title="Greater than or equal"
+                    >
+                      ≥
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('<=');
+                      }}
+                      title="Less than or equal"
+                    >
+                      ≤
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.formulaOperatorBtn}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertFormulaTokenAtCursor('=');
+                      }}
+                      title="Equal"
+                    >
+                      =
+                    </button>
+                  </div>
+                  {/* <div className={styles.formulaDropdownSectionLabel}>Columns</div>
                     {existingProperties && existingProperties.length > 0 ? (
                       existingProperties.map((prop) => (
                         <button
@@ -779,363 +779,360 @@ export function AddColumnModal({
                     ) : (
                       <div className={styles.formulaEmptyHint}>No columns available.</div>
                     )} */}
-                    <div className={styles.formulaDropdownSectionLabel}>Functions</div>
-                    {/* IF(condition, value_if_true, value_if_false) */}
-                    <button
-                      type="button"
-                      className={styles.formulaItem}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const template = 'IF( , , )';
-                        insertFormulaTemplateAtCursor(template);
-                      }}
-                    >
-                      <div className={styles.formulaItemMain}>
-                        <span className={styles.formulaItemName}>IF()</span>
-                        <span className={styles.formulaItemMeta}>condition returns different values</span>
-                      </div>
-                    </button>
-                    {/* SUM(arg1, arg2, ...) */}
-                    <button
-                      type="button"
-                      className={styles.formulaItem}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const template = 'SUM( , , )';
-                        insertFormulaTemplateAtCursor(template);
-                      }}
-                    >
-                      <div className={styles.formulaItemMain}>
-                        <span className={styles.formulaItemName}>SUM()</span>
-                        <span className={styles.formulaItemMeta}>sum of values</span>
-                      </div>
-                    </button>
-                    {/* AVERAGE(arg1, arg2, ...) */}
-                    <button
-                      type="button"
-                      className={styles.formulaItem}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const template = 'AVERAGE( , , )';
-                        insertFormulaTemplateAtCursor(template);
-                      }}
-                    >
-                      <div className={styles.formulaItemMain}>
-                        <span className={styles.formulaItemName}>AVERAGE()</span>
-                        <span className={styles.formulaItemMeta}>average of values</span>
-                      </div>
-                    </button>
-                    {/* MIN(arg1, arg2, ...) */}
-                    <button
-                      type="button"
-                      className={styles.formulaItem}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const template = 'MIN( , , )';
-                        insertFormulaTemplateAtCursor(template);
-                      }}
-                    >
-                      <div className={styles.formulaItemMain}>
-                        <span className={styles.formulaItemName}>MIN()</span>
-                        <span className={styles.formulaItemMeta}>minimum of values</span>
-                      </div>
-                    </button>
-                    {/* MAX(arg1, arg2, ...) */}
-                    <button
-                      type="button"
-                      className={styles.formulaItem}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const template = 'MAX( , , )';
-                        insertFormulaTemplateAtCursor(template);
-                      }}
-                    >
-                      <div className={styles.formulaItemMain}>
-                        <span className={styles.formulaItemName}>MAX()</span>
-                        <span className={styles.formulaItemMeta}>maximum of values</span>
-                      </div>
-                    </button>
-                    {/* ROUND(value, digits) */}
-                    <button
-                      type="button"
-                      className={styles.formulaItem}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const template = 'ROUND( , 2)';
-                        insertFormulaTemplateAtCursor(template);
-                      }}
-                    >
-                      <div className={styles.formulaItemMain}>
-                        <span className={styles.formulaItemName}>ROUND()</span>
-                        <span className={styles.formulaItemMeta}>round number</span>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          <div className={styles.field}>
-            <label className={`${styles.label} ${styles.labelOptional}`} htmlFor="add-column-desc">
-              Description
-            </label>
-            <Input.TextArea
-              id="add-column-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
-              placeholder="Type..."
-              className={styles.textarea}
-              rows={2}
-              maxLength={DESCRIPTION_MAX}
-              showCount={false}
-            />
-            <span className={styles.hint}>({DESCRIPTION_MAX} characters limit)</span>
-          </div>
-          {dataType === 'enum' && (
-            <div className={styles.field}>
-              <label className={styles.label}>
-                Options<span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>
-              </label>
-              <div className={styles.optionsContainer}>
-                {enumOptions.map((opt, index) => (
-                  <div key={index} className={styles.optionRow}>
-                    <Input
-                      value={opt}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setEnumOptions((prev) => {
-                          const next = [...prev];
-                          next[index] = value;
-                          return next;
-                        });
-                      }}
-                      placeholder="Enter option"
-                      className={styles.optionInput}
-                    />
-                    <button
-                      type="button"
-                      className={styles.removeOptionBtn}
-                      onClick={() => {
-                        setEnumOptions((prev) => prev.filter((_, i) => i !== index));
-                      }}
-                      aria-label="Remove option"
-                    >
-                      −
-                    </button>
-                  </div>
-                ))}
-                {enumOptions.length === 0 && (
-                  <div className={styles.emptyOptionsHint}>Click "Add option" to define choices.</div>
-                )}
-                <button
-                  type="button"
-                  className={styles.addOptionBtn}
-                  onClick={() => setEnumOptions((prev) => [...prev, ''])}
-                >
-                  + Add new option
-                </button>
-              </div>
-            </div>
-          )}
-          {dataType === 'reference' && (
-            <div className={styles.field}>
-              <label className={styles.label}>
-                Reference libraries<span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>
-              </label>
-              <Select
-                mode="multiple"
-                className={styles.referenceSelect}
-                placeholder="Select libraries to reference"
-                suffixIcon={
-                  <svg
-                    width="12"
-                    height="7"
-                    viewBox="0 0 12 7"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+                  <div className={styles.formulaDropdownSectionLabel}>Functions</div>
+                  {/* IF(condition, value_if_true, value_if_false) */}
+                  <button
+                    type="button"
+                    className={styles.formulaItem}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const template = 'IF( , , )';
+                      insertFormulaTemplateAtCursor(template);
+                    }}
                   >
-                    <path
-                      d="M0.75 0.75L5.75 5.75L10.75 0.75"
-                      stroke="#21272A"
-                      style={{
-                        stroke: '#21272A',
-                        strokeOpacity: 1,
-                      }}
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                }
-                value={referenceLibraries}
-                loading={loadingLibraries || loadingFolders}
-                onChange={(values) => {
-                  setReferenceLibraries(values as string[]);
-                  setError(null);
-                }}
-                getPopupContainer={(node) => node.parentElement ?? document.body}
-                options={libraries.map((lib) => ({
-                  label: lib.name,
-                  value: lib.id,
-                }))}
-                maxTagCount="responsive"
-                open={referenceDropdownOpen}
-                onDropdownVisibleChange={(openDropdown) => {
-                  setReferenceDropdownOpen(openDropdown);
-                  if (!openDropdown) {
-                    setReferenceFolderFilter('all');
-                    setReferenceSearch('');
-                  }
-                }}
-                dropdownRender={() => (
-                  <div className={styles.referenceDropdown}>
-                    <div className={styles.referenceDropdownContent}>
-                      <Input
-                        allowClear
-                        placeholder="Search libraries"
-                        value={referenceSearch}
-                        onChange={(e) => setReferenceSearch(e.target.value)}
-                        className={styles.referenceSearchInput}
-                        prefix={
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z"
-                              stroke="currentColor"
-                              style={{ stroke: 'currentColor', strokeOpacity: 1 }}
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path
-                              d="M20.9999 21.0004L16.6499 16.6504"
-                              stroke="currentColor"
-                              style={{ stroke: 'currentColor', strokeOpacity: 1 }}
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        }
-                      />
-                      <div className={styles.referenceFolderTabs}>
-                        <button
-                          type="button"
-                          className={`${styles.referenceFolderTab} ${
-                            referenceFolderFilter === 'all' ? styles.referenceFolderTabActive : ''
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReferenceFolderFilter('all');
-                          }}
-                        >
-                          All folders
-                        </button>
-                        {folders.map((folder) => (
-                          <button
-                            key={folder.id}
-                            type="button"
-                            className={`${styles.referenceFolderTab} ${
-                              referenceFolderFilter === folder.id ? styles.referenceFolderTabActive : ''
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReferenceFolderFilter(folder.id);
-                            }}
-                          >
-                            {folder.name}
-                          </button>
-                        ))}
-                        {librariesWithoutFolder.length > 0 && (
-                          <button
-                            type="button"
-                            className={`${styles.referenceFolderTab} ${
-                              referenceFolderFilter === 'root' ? styles.referenceFolderTabActive : ''
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReferenceFolderFilter('root');
-                            }}
-                          >
-                            No folder
-                          </button>
-                        )}
-                      </div>
-                      <div className={styles.referenceOptionsList}>
-                        {loadingLibraries || loadingFolders ? (
-                          <div className={styles.referenceEmptyHint}>Loading libraries…</div>
-                        ) : filteredReferenceLibraries.length === 0 ? (
-                          <div className={styles.referenceEmptyHint}>No libraries found.</div>
-                        ) : (
-                          filteredReferenceLibraries.map((lib) => {
-                            const checked = referenceLibraries.includes(lib.id);
-                            const folderName =
-                              lib.folder_id && foldersById.get(lib.folder_id)
-                                ? foldersById.get(lib.folder_id)!.name
-                                : librariesWithFolder.length > 0
-                                ? 'No folder'
-                                : '';
-                            return (
-                              <label
-                                key={lib.id}
-                                className={styles.referenceOptionRow}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  onChange={(e) => {
-                                    const isChecked = e.target.checked;
-                                    setReferenceLibraries((prev) => {
-                                      const next = isChecked
-                                        ? [...prev, lib.id]
-                                        : prev.filter((id) => id !== lib.id);
-                                      return Array.from(new Set(next));
-                                    });
-                                    setError(null);
-                                  }}
-                                />
-                                <span className={styles.referenceOptionLabel}>{lib.name}</span>
-                                {folderName && (
-                                  <span className={styles.referenceOptionFolderTag}>{folderName}</span>
-                                )}
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
+                    <div className={styles.formulaItemMain}>
+                      <span className={styles.formulaItemName}>IF()</span>
+                      <span className={styles.formulaItemMeta}>condition returns different values</span>
                     </div>
-                  </div>
-                )}
-              />
-              {!loadingLibraries && referenceLibraries.length === 0 && (
-                <span className={styles.hint}>
-                  Choose one or more libraries that this column can reference.
-                </span>
+                  </button>
+                  {/* SUM(arg1, arg2, ...) */}
+                  <button
+                    type="button"
+                    className={styles.formulaItem}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const template = 'SUM( , , )';
+                      insertFormulaTemplateAtCursor(template);
+                    }}
+                  >
+                    <div className={styles.formulaItemMain}>
+                      <span className={styles.formulaItemName}>SUM()</span>
+                      <span className={styles.formulaItemMeta}>sum of values</span>
+                    </div>
+                  </button>
+                  {/* AVERAGE(arg1, arg2, ...) */}
+                  <button
+                    type="button"
+                    className={styles.formulaItem}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const template = 'AVERAGE( , , )';
+                      insertFormulaTemplateAtCursor(template);
+                    }}
+                  >
+                    <div className={styles.formulaItemMain}>
+                      <span className={styles.formulaItemName}>AVERAGE()</span>
+                      <span className={styles.formulaItemMeta}>average of values</span>
+                    </div>
+                  </button>
+                  {/* MIN(arg1, arg2, ...) */}
+                  <button
+                    type="button"
+                    className={styles.formulaItem}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const template = 'MIN( , , )';
+                      insertFormulaTemplateAtCursor(template);
+                    }}
+                  >
+                    <div className={styles.formulaItemMain}>
+                      <span className={styles.formulaItemName}>MIN()</span>
+                      <span className={styles.formulaItemMeta}>minimum of values</span>
+                    </div>
+                  </button>
+                  {/* MAX(arg1, arg2, ...) */}
+                  <button
+                    type="button"
+                    className={styles.formulaItem}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const template = 'MAX( , , )';
+                      insertFormulaTemplateAtCursor(template);
+                    }}
+                  >
+                    <div className={styles.formulaItemMain}>
+                      <span className={styles.formulaItemName}>MAX()</span>
+                      <span className={styles.formulaItemMeta}>maximum of values</span>
+                    </div>
+                  </button>
+                  {/* ROUND(value, digits) */}
+                  <button
+                    type="button"
+                    className={styles.formulaItem}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const template = 'ROUND( , 2)';
+                      insertFormulaTemplateAtCursor(template);
+                    }}
+                  >
+                    <div className={styles.formulaItemMain}>
+                      <span className={styles.formulaItemName}>ROUND()</span>
+                      <span className={styles.formulaItemMeta}>round number</span>
+                    </div>
+                  </button>
+                </div>
               )}
             </div>
-          )}
-          {error && <div className={styles.errorText}>{error}</div>}
-        </div>
-        <div className={styles.body} style={{ paddingTop: 0, paddingBottom: '1.25rem' }}>
-          <div className={styles.footer}>
-            <button type="button" className={styles.cancelBtn} onClick={handleRequestClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={styles.addBtn}
-              onClick={handleSubmit}
-              disabled={submitting}
-            >
-              Add
-            </button>
           </div>
+        )}
+        <div className={styles.field}>
+          <label className={`${styles.label} ${styles.labelOptional}`} htmlFor="add-column-desc">
+            Description
+          </label>
+          <Input.TextArea
+            id="add-column-desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
+            placeholder="Type..."
+            className={styles.textarea}
+            rows={2}
+            maxLength={DESCRIPTION_MAX}
+            showCount={false}
+          />
+          <span className={styles.hint}>({DESCRIPTION_MAX} characters limit)</span>
         </div>
+        {dataType === 'enum' && (
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Options<span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>
+            </label>
+            <div className={styles.optionsContainer}>
+              {enumOptions.map((opt, index) => (
+                <div key={index} className={styles.optionRow}>
+                  <Input
+                    value={opt}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setEnumOptions((prev) => {
+                        const next = [...prev];
+                        next[index] = value;
+                        return next;
+                      });
+                    }}
+                    placeholder="Enter option"
+                    className={styles.optionInput}
+                  />
+                  <button
+                    type="button"
+                    className={styles.removeOptionBtn}
+                    onClick={() => {
+                      setEnumOptions((prev) => prev.filter((_, i) => i !== index));
+                    }}
+                    aria-label="Remove option"
+                  >
+                    −
+                  </button>
+                </div>
+              ))}
+              {enumOptions.length === 0 && (
+                <div className={styles.emptyOptionsHint}>Click "Add option" to define choices.</div>
+              )}
+              <button
+                type="button"
+                className={styles.addOptionBtn}
+                onClick={() => setEnumOptions((prev) => [...prev, ''])}
+              >
+                + Add new option
+              </button>
+            </div>
+          </div>
+        )}
+        {dataType === 'reference' && (
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Reference libraries<span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>
+            </label>
+            <Select
+              mode="multiple"
+              className={styles.referenceSelect}
+              placeholder="Select libraries to reference"
+              suffixIcon={
+                <svg
+                  width="12"
+                  height="7"
+                  viewBox="0 0 12 7"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M0.75 0.75L5.75 5.75L10.75 0.75"
+                    stroke="#21272A"
+                    style={{
+                      stroke: '#21272A',
+                      strokeOpacity: 1,
+                    }}
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              }
+              value={referenceLibraries}
+              loading={loadingLibraries || loadingFolders}
+              onChange={(values) => {
+                setReferenceLibraries(values as string[]);
+                setError(null);
+              }}
+              getPopupContainer={(node) => node.parentElement ?? document.body}
+              options={libraries.map((lib) => ({
+                label: lib.name,
+                value: lib.id,
+              }))}
+              maxTagCount="responsive"
+              open={referenceDropdownOpen}
+              onOpenChange={(openDropdown) => {
+                setReferenceDropdownOpen(openDropdown);
+                if (!openDropdown) {
+                  setReferenceFolderFilter('all');
+                  setReferenceSearch('');
+                }
+              }}
+              popupRender={() => (
+                <div className={styles.referenceDropdown}>
+                  <div className={styles.referenceDropdownContent}>
+                    <Input
+                      allowClear
+                      placeholder="Search libraries"
+                      value={referenceSearch}
+                      onChange={(e) => setReferenceSearch(e.target.value)}
+                      className={styles.referenceSearchInput}
+                      prefix={
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z"
+                            stroke="currentColor"
+                            style={{ stroke: 'currentColor', strokeOpacity: 1 }}
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M20.9999 21.0004L16.6499 16.6504"
+                            stroke="currentColor"
+                            style={{ stroke: 'currentColor', strokeOpacity: 1 }}
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      }
+                    />
+                    <div className={styles.referenceFolderTabs}>
+                      <button
+                        type="button"
+                        className={`${styles.referenceFolderTab} ${referenceFolderFilter === 'all' ? styles.referenceFolderTabActive : ''
+                          }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReferenceFolderFilter('all');
+                        }}
+                      >
+                        All folders
+                      </button>
+                      {folders.map((folder) => (
+                        <button
+                          key={folder.id}
+                          type="button"
+                          className={`${styles.referenceFolderTab} ${referenceFolderFilter === folder.id ? styles.referenceFolderTabActive : ''
+                            }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReferenceFolderFilter(folder.id);
+                          }}
+                        >
+                          {folder.name}
+                        </button>
+                      ))}
+                      {librariesWithoutFolder.length > 0 && (
+                        <button
+                          type="button"
+                          className={`${styles.referenceFolderTab} ${referenceFolderFilter === 'root' ? styles.referenceFolderTabActive : ''
+                            }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReferenceFolderFilter('root');
+                          }}
+                        >
+                          No folder
+                        </button>
+                      )}
+                    </div>
+                    <div className={styles.referenceOptionsList}>
+                      {loadingLibraries || loadingFolders ? (
+                        <div className={styles.referenceEmptyHint}>Loading libraries…</div>
+                      ) : filteredReferenceLibraries.length === 0 ? (
+                        <div className={styles.referenceEmptyHint}>No libraries found.</div>
+                      ) : (
+                        filteredReferenceLibraries.map((lib) => {
+                          const checked = referenceLibraries.includes(lib.id);
+                          const folderName =
+                            lib.folder_id && foldersById.get(lib.folder_id)
+                              ? foldersById.get(lib.folder_id)!.name
+                              : librariesWithFolder.length > 0
+                                ? 'No folder'
+                                : '';
+                          return (
+                            <label
+                              key={lib.id}
+                              className={styles.referenceOptionRow}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setReferenceLibraries((prev) => {
+                                    const next = isChecked
+                                      ? [...prev, lib.id]
+                                      : prev.filter((id) => id !== lib.id);
+                                    return Array.from(new Set(next));
+                                  });
+                                  setError(null);
+                                }}
+                              />
+                              <span className={styles.referenceOptionLabel}>{lib.name}</span>
+                              {folderName && (
+                                <span className={styles.referenceOptionFolderTag}>{folderName}</span>
+                              )}
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+            {!loadingLibraries && referenceLibraries.length === 0 && (
+              <span className={styles.hint}>
+                Choose one or more libraries that this column can reference.
+              </span>
+            )}
+          </div>
+        )}
+        {error && <div className={styles.errorText}>{error}</div>}
+      </div>
+      <div className={styles.body} style={{ paddingTop: 0, paddingBottom: '1.25rem' }}>
+        <div className={styles.footer}>
+          <button type="button" className={styles.cancelBtn} onClick={handleRequestClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.addBtn}
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            Add
+          </button>
+        </div>
+      </div>
     </div>
   );
 

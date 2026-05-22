@@ -27,6 +27,10 @@ import type { AssetRow, PropertyConfig } from '@/lib/types/libraryAssets';
 import type { CellUpdateEvent, AssetCreateEvent, AssetDeleteEvent, PresenceState, CellsBatchUpdateEvent } from '@/lib/types/collaboration';
 import { serializeError } from '@/lib/utils/errorUtils';
 import { getLibraryAssetsWithProperties } from '@/lib/services/libraryAssetsService';
+import {
+  syncReferencesForSourceChanges,
+  type ReferenceCellUpdate,
+} from '@/lib/services/referenceSyncService';
 import { computeFormulaValuesForRow } from '@/lib/utils/formula';
 
 interface LibraryDataContextValue {
@@ -34,29 +38,29 @@ interface LibraryDataContextValue {
   assets: Map<string, AssetRow>;
   getAsset: (assetId: string) => AssetRow | undefined;
   allAssets: AssetRow[]; // Ordered array (from Yjs)
-  
+
   // Data operations
   updateAssetField: (assetId: string, fieldId: string, value: any, options?: { skipBroadcast?: boolean }) => Promise<void>;
   updateAssetName: (assetId: string, newName: string, options?: { skipBroadcast?: boolean }) => Promise<void>;
   createAsset: (name: string, propertyValues: Record<string, any>, options?: { insertAfterRowId?: string; insertBeforeRowId?: string; createdAt?: Date; rowIndex?: number; skipReload?: boolean }) => Promise<string>;
   deleteAsset: (assetId: string) => Promise<void>;
-  
+
   // Bulk operations
   updateMultipleFields: (updates: Array<{ assetId: string; fieldId: string; value: any }>) => Promise<void>;
   updateAssetsBatch: (updates: Array<{ assetId: string; assetName: string; propertyValues: Record<string, any> }>) => Promise<void>;
-  
+
   // Realtime collaboration
   connectionStatus: ConnectionStatus;
-  
+
   // Presence tracking
   getUsersEditingField: (assetId: string, fieldId: string) => PresenceState[];
   setActiveField: (assetId: string | null, fieldId: string | null) => void;
   presenceUsers: PresenceState[];
-  
+
   // Yjs access (for advanced operations)
   yDoc: Y.Doc;
   yAssets: Y.Map<Y.Map<any>>;
-  
+
   // Loading states
   isLoading: boolean;
   isSynced: boolean;
@@ -142,39 +146,39 @@ async function touchLibraryUpdatedAt(
 export function LibraryDataProvider({ children, libraryId, projectId }: LibraryDataProviderProps) {
   const supabase = useSupabase();
   const { userProfile } = useAuth();
-  
+
   // Yjs setup - shared data structure
   const yDoc = useMemo(() => new Y.Doc(), [libraryId]);
   const yAssets = useMemo(() => yDoc.getMap<Y.Map<any>>('assets'), [yDoc]);
-  
+
   // State
   const [assets, setAssets] = useState<Map<string, AssetRow>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isSynced, setIsSynced] = useState(false);
-  
+
   // Refs to avoid stale closures
   const assetsRef = useRef<Map<string, AssetRow>>(new Map());
   const isMountedRef = useRef(true);
   // Track asset IDs created during a batch insert (skipReload=true) so that
   // postgres_changes INSERT events don't add them to yAssets with missing row_index.
   const pendingBatchInsertIdsRef = useRef<Set<string>>(new Set());
-  
+
   // Keep ref updated
   useEffect(() => {
     assetsRef.current = assets;
   }, [assets]);
-  
+
   // Sync Yjs Map to React state
   useEffect(() => {
     const updateAssetsFromYjs = () => {
       const newAssets = new Map<string, AssetRow>();
-      
+
       yAssets.forEach((yAsset, assetId) => {
         const name = yAsset.get('name') || 'Untitled';
         const yPropertyValues = yAsset.get('propertyValues');
         const createdAt = yAsset.get('created_at');
         const rowIndex = yAsset.get('row_index');
-        
+
         // Convert Y.Map to plain object
         const propertyValues: Record<string, any> = {};
         if (yPropertyValues && typeof yPropertyValues.forEach === 'function') {
@@ -185,7 +189,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
           // Fallback for plain objects (shouldn't happen after initialization)
           Object.assign(propertyValues, yPropertyValues);
         }
-        
+
         newAssets.set(assetId, {
           id: assetId,
           libraryId,
@@ -195,35 +199,35 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
           rowIndex: typeof rowIndex === 'number' ? rowIndex : undefined,
         });
       });
-      
-      
+
+
       if (isMountedRef.current) {
         setAssets(newAssets);
       } else {
       }
     };
-    
+
     // Initial sync
     updateAssetsFromYjs();
-    
+
     // Listen to Yjs changes (using observeDeep to catch nested Y.Map changes)
     const observer = () => {
       updateAssetsFromYjs();
     };
-    
+
     yAssets.observeDeep(observer);
-    
+
     return () => {
       yAssets.unobserveDeep(observer);
     };
   }, [yAssets, libraryId]);
-  
+
   // Load initial data from database (can be reused after restore)
   const loadInitialData = useCallback(async () => {
     if (!libraryId) return;
-    
+
     setIsLoading(true);
-    
+
     try {
       // 使用与版本快照完全一致的服务读取当前库数据，避免「当前视图」和「版本快照」两套取数逻辑
       const assetRows: AssetRow[] = await getLibraryAssetsWithProperties(supabase, libraryId);
@@ -232,11 +236,11 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       // Always clear existing Yjs state first to avoid mixing old and new data
       yDoc.transact(() => {
         yAssets.clear();
-        
+
         assetRows.forEach((asset: AssetRow) => {
           const yAsset = new Y.Map();
           yAsset.set('name', asset.name);
-          
+
           // Create Y.Map for propertyValues (nested structure)
           const yPropertyValues = new Y.Map();
           const values = asset.propertyValues || {};
@@ -249,13 +253,13 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
             yPropertyValues.set(fieldId, valueForYjs);
           });
           yAsset.set('propertyValues', yPropertyValues);
-          
+
           if (asset.created_at) yAsset.set('created_at', asset.created_at);
           if (typeof asset.rowIndex === 'number') yAsset.set('row_index', asset.rowIndex);
           yAssets.set(asset.id, yAsset as any);
         });
       });
-      
+
     } catch (error) {
       console.error('[LibraryDataContext] Failed to load initial data:', error);
     } finally {
@@ -361,7 +365,33 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       supabase.removeChannel(channel);
     };
   }, [libraryId, supabase, loadInitialData]);
-  
+
+  // Global cell search replace writes via API; reload Yjs from DB so the table reflects new values.
+  useEffect(() => {
+    const handleCellValuesReplaced = (event: Event) => {
+      const customEvent = event as CustomEvent<{ libraryId?: string }>;
+      const targetLibraryId = customEvent.detail?.libraryId;
+      if (!targetLibraryId || targetLibraryId !== libraryId) return;
+      loadInitialData();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener(
+        'libraryCellValuesReplaced',
+        handleCellValuesReplaced as EventListener
+      );
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(
+          'libraryCellValuesReplaced',
+          handleCellValuesReplaced as EventListener
+        );
+      }
+    };
+  }, [libraryId, loadInitialData]);
+
   // Batch queue for cell updates - apply in one transact so UI updates at once (fixes "one by one" disappearing)
   const cellUpdateQueueRef = useRef<CellUpdateEvent[]>([]);
   const cellUpdateFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -375,12 +405,12 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     if (error) throw error;
     return (data ?? []) as FormulaFieldMetaRow[];
   }, [supabase, libraryId]);
-  
+
   const flushCellUpdateQueue = useCallback(() => {
     const events = cellUpdateQueueRef.current;
     cellUpdateQueueRef.current = [];
     if (events.length === 0) return;
-    
+
     yDoc.transact(() => {
       for (const event of events) {
         const yAsset = yAssets.get(event.assetId);
@@ -389,7 +419,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
         if (!yPropertyValues) continue;
         const currentValue = yPropertyValues.get(event.propertyKey);
         if (JSON.stringify(currentValue) === JSON.stringify(event.newValue)) continue;
-        
+
         let valueForYjs = event.newValue;
         if (event.newValue !== null && typeof event.newValue === 'object') {
           valueForYjs = JSON.parse(JSON.stringify(event.newValue));
@@ -401,7 +431,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       }
     });
   }, [yAssets, yDoc]);
-  
+
   // Realtime collaboration event handlers
   // 队列里已有多个事件时用较长延迟收集更多，协作者端多条 postgres 更新会合并成一次应用，与操作者「一次性消失」一致
   const handleCellUpdateEvent = useCallback((event: CellUpdateEvent) => {
@@ -413,7 +443,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       flushCellUpdateQueue();
     }, delay);
   }, [flushCellUpdateQueue]);
-  
+
   const handleAssetCreateEvent = useCallback((event: AssetCreateEvent) => {
     // Skip if asset already exists in Yjs (e.g. from loadInitialData or a prior broadcast).
     // This prevents the postgres_changes INSERT handler (which creates a synthetic event
@@ -434,7 +464,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     // Add new asset to Yjs (using Y.Map for propertyValues)
     const yAsset = new Y.Map();
     yAsset.set('name', event.assetName);
-    
+
     // Create Y.Map for propertyValues
     const yPropertyValues = new Y.Map();
     Object.entries(event.propertyValues).forEach(([fieldId, value]) => {
@@ -456,19 +486,19 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     if (typeof event.rowIndex === 'number') {
       yAsset.set('row_index', event.rowIndex);
     }
-    
+
     yDoc.transact(() => {
       yAssets.set(event.assetId, yAsset);
     });
   }, [yAssets, yDoc]);
-  
+
   const handleAssetDeleteEvent = useCallback((event: AssetDeleteEvent) => {
     // Remove asset from Yjs
     yDoc.transact(() => {
       yAssets.delete(event.assetId);
     });
   }, [yAssets, yDoc]);
-  
+
   const handleConflictEvent = useCallback((event: CellUpdateEvent, localValue: any) => {
     // For now, remote wins (can enhance with UI later)
     console.warn('[LibraryDataContext] Conflict detected:', event);
@@ -504,13 +534,13 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       }
     });
   }, [yAssets, yDoc]);
-  
+
   // Initialize realtime subscription
   const realtimeConfig = useMemo(() => {
     if (!userProfile || !libraryId) {
       return null;
     }
-    
+
     return {
       libraryId,
       currentUserId: userProfile.id,
@@ -525,7 +555,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       onCellsBatchUpdate: handleCellsBatchUpdateEvent,
     };
   }, [libraryId, userProfile, handleCellUpdateEvent, handleAssetCreateEvent, handleAssetDeleteEvent, handleConflictEvent, handleRowOrderChangeEvent, handleCellsBatchUpdateEvent]);
-  
+
   const realtimeSubscription = useRealtimeSubscription(
     realtimeConfig || {
       libraryId: '',
@@ -533,25 +563,25 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       currentUserName: '',
       currentUserEmail: '',
       avatarColor: '',
-      onCellUpdate: () => {},
-      onAssetCreate: () => {},
-      onAssetDelete: () => {},
-      onConflict: () => {},
-      onRowOrderChange: () => {},
-      onCellsBatchUpdate: () => {},
+      onCellUpdate: () => { },
+      onAssetCreate: () => { },
+      onAssetDelete: () => { },
+      onConflict: () => { },
+      onRowOrderChange: () => { },
+      onCellsBatchUpdate: () => { },
     }
   );
-  
-  const { connectionStatus, broadcastCellUpdate, broadcastAssetCreate, broadcastAssetDelete, broadcastCellsBatchUpdate, broadcastRowOrderChange } = 
+
+  const { connectionStatus, broadcastCellUpdate, broadcastAssetCreate, broadcastAssetDelete, broadcastCellsBatchUpdate, broadcastRowOrderChange } =
     realtimeConfig ? realtimeSubscription : {
       connectionStatus: 'disconnected' as const,
-      broadcastCellUpdate: async () => {},
-      broadcastAssetCreate: async () => {},
-      broadcastAssetDelete: async () => {},
-      broadcastCellsBatchUpdate: async () => {},
-      broadcastRowOrderChange: async () => {},
+      broadcastCellUpdate: async () => { },
+      broadcastAssetCreate: async () => { },
+      broadcastAssetDelete: async () => { },
+      broadcastCellsBatchUpdate: async () => { },
+      broadcastRowOrderChange: async () => { },
     };
-  
+
   // Presence tracking - use useMemo to avoid recreating config on every render
   const presenceConfig = useMemo(() => ({
     libraryId: libraryId || '',
@@ -561,9 +591,72 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     avatarColor: userProfile ? getUserAvatarColor(userProfile.id) : '#999999',
     debugLabel: 'LibraryData',
   }), [libraryId, userProfile]);
-  
+
   const presenceTracking = usePresenceTracking(presenceConfig);
-  
+
+  const applyReferenceSyncToLocalState = useCallback(
+    (refUpdates: ReferenceCellUpdate[]) => {
+      if (refUpdates.length === 0) return;
+
+      yDoc.transact(() => {
+        for (const u of refUpdates) {
+          if (u.referencingLibraryId !== libraryId) continue;
+          const yAsset = yAssets.get(u.referencingAssetId);
+          if (!yAsset) continue;
+          const yPropertyValues = yAsset.get('propertyValues') as Y.Map<any> | undefined;
+          if (!yPropertyValues) continue;
+          let valueForYjs = u.newReferenceValue;
+          if (valueForYjs !== null && typeof valueForYjs === 'object') {
+            valueForYjs = JSON.parse(JSON.stringify(valueForYjs));
+          }
+          yPropertyValues.set(u.referencingFieldId, valueForYjs);
+        }
+      });
+
+      if (typeof window === 'undefined') return;
+
+      const libraryIdsToReload = new Set(
+        refUpdates.map((u) => u.referencingLibraryId).filter(Boolean)
+      );
+      libraryIdsToReload.forEach((id) => {
+        window.dispatchEvent(
+          new CustomEvent('libraryCellValuesReplaced', { detail: { libraryId: id } })
+        );
+      });
+
+      const referencingAssetIds = new Set(refUpdates.map((u) => u.referencingAssetId));
+      referencingAssetIds.forEach((refAssetId) => {
+        const libId =
+          refUpdates.find((u) => u.referencingAssetId === refAssetId)?.referencingLibraryId ??
+          libraryId;
+        window.dispatchEvent(new CustomEvent('assetUpdated', { detail: { assetId: refAssetId, libraryId: libId } }));
+      });
+    },
+    [libraryId, yDoc, yAssets]
+  );
+
+  const syncReferencesAfterSourceChange = useCallback(
+    async (assetId: string, fieldId: string, valueJson: unknown) => {
+      try {
+        const refUpdates = await syncReferencesForSourceChanges(supabase, [
+          { assetId, fieldId, valueJson },
+        ]);
+        applyReferenceSyncToLocalState(refUpdates);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('referenceSourceUpdated', { detail: { assetId, fieldId } })
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[LibraryDataContext] reference sync failed: assetId=${assetId} fieldId=${fieldId}`,
+          serializeError(error)
+        );
+      }
+    },
+    [supabase, applyReferenceSyncToLocalState]
+  );
+
   // Data operations
   const updateAssetField = useCallback(async (
     assetId: string,
@@ -576,7 +669,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     if (!yAsset) {
       throw new Error(`Asset ${assetId} not found`);
     }
-    
+
     const yPropertyValues = yAsset.get('propertyValues') as Y.Map<any>;
     if (!yPropertyValues) {
       throw new Error(`propertyValues not found for asset ${assetId}`);
@@ -662,12 +755,23 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       // 更新库内单元格成功后，刷新 library / folder / project 的 updated_at，供 TopBar 搜索排序使用
       await touchLibraryUpdatedAt(supabase, libraryId, projectId);
 
+      await syncReferencesAfterSourceChange(assetId, fieldId, valueForYjs);
+      for (const [formulaFieldId, formulaValue] of changedFormulaEntries) {
+        await syncReferencesAfterSourceChange(assetId, formulaFieldId, formulaValue);
+      }
+
       if (!options?.skipBroadcast && realtimeConfig) {
         await new Promise(resolve => setTimeout(resolve, 100));
         await broadcastCellUpdate(assetId, fieldId, valueForYjs, oldValue);
         for (const [formulaFieldId, formulaValue] of changedFormulaEntries) {
           await broadcastCellUpdate(assetId, formulaFieldId, formulaValue, oldFormulaValues[formulaFieldId]);
         }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('assetUpdated', { detail: { assetId, libraryId, fieldId } })
+        );
       }
     } catch (error) {
       const errMsg = serializeError(error);
@@ -685,8 +789,17 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       });
       throw error;
     }
-  }, [getFormulaFieldMeta, yAssets, yDoc, supabase, broadcastCellUpdate, realtimeConfig]);
-  
+  }, [
+    getFormulaFieldMeta,
+    yAssets,
+    yDoc,
+    supabase,
+    broadcastCellUpdate,
+    realtimeConfig,
+    syncReferencesAfterSourceChange,
+    libraryId,
+  ]);
+
   const updateAssetName = useCallback(async (
     assetId: string,
     newName: string,
@@ -697,24 +810,24 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     if (!yAsset) {
       throw new Error(`Asset ${assetId} not found`);
     }
-    
+
     const oldName = yAsset.get('name');
-    
+
     yDoc.transact(() => {
       yAsset.set('name', newName);
     });
-    
+
     // 2. Save to database
     try {
       const { error } = await supabase
         .from('library_assets')
         .update({ name: newName })
         .eq('id', assetId);
-      
+
       if (error) throw error;
-      
+
       await touchLibraryUpdatedAt(supabase, libraryId, projectId);
-      
+
       // 3. Broadcast as field update (name is a special field)
       if (!options?.skipBroadcast && realtimeConfig) {
         await broadcastCellUpdate(assetId, 'name', newName, oldName);
@@ -727,7 +840,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       throw error;
     }
   }, [yAssets, yDoc, supabase, broadcastCellUpdate, realtimeConfig]);
-  
+
   const createAsset = useCallback(async (
     name: string,
     propertyValues: Record<string, any>,
@@ -779,9 +892,9 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       })
       .select()
       .single();
-    
+
     if (assetError) throw assetError;
-    
+
     const assetId = newAsset.id;
 
     // For any insert with explicit rowIndex, register the ID so that
@@ -792,22 +905,22 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     if (typeof options?.rowIndex === 'number') {
       pendingBatchInsertIdsRef.current.add(assetId);
     }
-    
+
     // 2. Insert field values
     const fieldValues = Object.entries(mergedPropertyValues).map(([fieldId, value]) => ({
       asset_id: assetId,
       field_id: fieldId,
       value_json: value,
     }));
-    
+
     if (fieldValues.length > 0) {
       const { error: valuesError } = await supabase
         .from('library_asset_values')
         .insert(fieldValues);
-      
+
       if (valuesError) throw valuesError;
     }
-    
+
     // 额外：库内新增行，刷新 library / folder / project 的 updated_at
     await touchLibraryUpdatedAt(supabase, libraryId, projectId);
 
@@ -818,7 +931,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     if (typeof options?.rowIndex !== 'number') {
       const yAsset = new Y.Map();
       yAsset.set('name', name);
-      
+
       // Create Y.Map for propertyValues
       const yPropertyValues = new Y.Map();
       Object.entries(mergedPropertyValues).forEach(([fieldId, value]) => {
@@ -867,35 +980,35 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
         pendingBatchInsertIdsRef.current.clear();
       }
     }
-    
+
     return assetId;
   }, [getFormulaFieldMeta, libraryId, supabase, yDoc, yAssets, broadcastAssetCreate, broadcastRowOrderChange, realtimeConfig, loadInitialData]);
-  
+
   const deleteAsset = useCallback(async (assetId: string) => {
     const asset = assetsRef.current.get(assetId);
     if (!asset) {
       throw new Error(`Asset ${assetId} not found`);
     }
-    
+
     // 1. Delete from database
     const { error } = await supabase
       .from('library_assets')
       .delete()
       .eq('id', assetId);
-    
+
     if (error) throw error;
-    
+
     // 2. Remove from Yjs
     yDoc.transact(() => {
       yAssets.delete(assetId);
     });
-    
+
     // 3. Broadcast deletion
     if (realtimeConfig) {
       await broadcastAssetDelete(assetId, asset.name);
     }
   }, [supabase, yDoc, yAssets, broadcastAssetDelete, realtimeConfig]);
-  
+
   const updateMultipleFields = useCallback(async (
     updates: Array<{ assetId: string; fieldId: string; value: any }>
   ) => {
@@ -903,9 +1016,9 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     const promises = updates.map(({ assetId, fieldId, value }) =>
       updateAssetField(assetId, fieldId, value, { skipBroadcast: true })
     );
-    
+
     await Promise.all(promises);
-    
+
     // Broadcast all updates after they're saved
     if (realtimeConfig) {
       for (const { assetId, fieldId, value } of updates) {
@@ -941,20 +1054,20 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       await broadcastCellsBatchUpdate(cellsToBroadcast);
     }
   }, [updateAssetName, updateAssetField, broadcastCellsBatchUpdate, realtimeConfig]);
-  
+
   // Helper functions
   const getAsset = useCallback((assetId: string) => {
     return assetsRef.current.get(assetId);
   }, []);
-  
+
   const getUsersEditingField = useCallback((assetId: string, fieldId: string) => {
     return presenceTracking.getUsersEditingCell(assetId, fieldId);
   }, [presenceTracking]);
-  
+
   const setActiveField = useCallback((assetId: string | null, fieldId: string | null) => {
     presenceTracking.updateActiveCell(assetId, fieldId);
   }, [presenceTracking]);
-  
+
   // Convert Map to ordered array (sort by rowIndex then id for deterministic order across clients)
   const allAssets = useMemo(() => {
     return Array.from(assets.values()).sort((a, b) => {
@@ -975,7 +1088,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
     });
   }, [assets]);
-  
+
   // Cleanup
   useEffect(() => {
     isMountedRef.current = true;
@@ -987,7 +1100,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
       }
     };
   }, []);
-  
+
   const contextValue: LibraryDataContextValue = {
     assets,
     getAsset,
@@ -1007,7 +1120,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     isLoading,
     isSynced,
   };
-  
+
   return (
     <LibraryDataContext.Provider value={contextValue}>
       {children}

@@ -582,7 +582,7 @@ export function EditColumnModal({
           </svg>
         </button>
       </div>
-        {/* Same as AddColumnModal: the top part is scrollable, the bottom button is fixed */}
+      {/* Same as AddColumnModal: the top part is scrollable, the bottom button is fixed */}
       <div className={`${styles.body} ${styles.scrollBody}`}>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="edit-column-name">
@@ -1032,23 +1032,23 @@ export function EditColumnModal({
               style={{ width: '100%' }}
               className={styles.referenceSelect}
               placeholder="Select libraries to reference"
-            suffixIcon={
-              <svg
-                width="12"
-                height="7"
-                viewBox="0 0 12 7"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M0.75 0.75L5.75 5.75L10.75 0.75"
-                  stroke="#21272A"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
+              suffixIcon={
+                <svg
+                  width="12"
+                  height="7"
+                  viewBox="0 0 12 7"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M0.75 0.75L5.75 5.75L10.75 0.75"
+                    stroke="#21272A"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              }
               value={editColumnModal.referenceLibraries}
               loading={editColumnModal.loadingLibraries || editColumnModal.loadingFolders}
               onChange={(values) =>
@@ -1109,9 +1109,8 @@ export function EditColumnModal({
                     <div className={styles.referenceFolderTabs}>
                       <button
                         type="button"
-                        className={`${styles.referenceFolderTab} ${
-                          referenceFolderFilter === 'all' ? styles.referenceFolderTabActive : ''
-                        }`}
+                        className={`${styles.referenceFolderTab} ${referenceFolderFilter === 'all' ? styles.referenceFolderTabActive : ''
+                          }`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setReferenceFolderFilter('all');
@@ -1123,9 +1122,8 @@ export function EditColumnModal({
                         <button
                           key={folder.id}
                           type="button"
-                          className={`${styles.referenceFolderTab} ${
-                            referenceFolderFilter === folder.id ? styles.referenceFolderTabActive : ''
-                          }`}
+                          className={`${styles.referenceFolderTab} ${referenceFolderFilter === folder.id ? styles.referenceFolderTabActive : ''
+                            }`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setReferenceFolderFilter(folder.id);
@@ -1137,9 +1135,8 @@ export function EditColumnModal({
                       {librariesWithoutFolder.length > 0 && (
                         <button
                           type="button"
-                          className={`${styles.referenceFolderTab} ${
-                            referenceFolderFilter === 'root' ? styles.referenceFolderTabActive : ''
-                          }`}
+                          className={`${styles.referenceFolderTab} ${referenceFolderFilter === 'root' ? styles.referenceFolderTabActive : ''
+                            }`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setReferenceFolderFilter('root');
@@ -1161,8 +1158,8 @@ export function EditColumnModal({
                             lib.folder_id && foldersById.get(lib.folder_id)
                               ? foldersById.get(lib.folder_id)!.name
                               : librariesWithFolder.length > 0
-                              ? 'No folder'
-                              : '';
+                                ? 'No folder'
+                                : '';
                           return (
                             <label
                               key={lib.id}
@@ -1227,73 +1224,73 @@ export function EditColumnModal({
   const confirmOverlay =
     showOverwriteConfirm && typeof document !== 'undefined'
       ? createPortal(
-          <div className={addColumnStyles.confirmOverlay}>
-            <div
-              className={addColumnStyles.confirmDialog}
-              style={{ height: '15.5rem' }}
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="overwrite-confirm-title"
-              aria-describedby="overwrite-confirm-description"
-            >
-              <div className={addColumnStyles.confirmHeader}>
-                <h3 id="overwrite-confirm-title" className={addColumnStyles.confirmTitle}>
-                  Alert
-                </h3>
-                <button
-                  type="button"
-                  className={addColumnStyles.confirmCloseBtn}
-                  aria-label="Close"
-                  onClick={() => setShowOverwriteConfirm(false)}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M12 4L4 12M4 4l8 8"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <div
-                id="overwrite-confirm-description"
-                className={addColumnStyles.confirmBody}
+        <div className={addColumnStyles.confirmOverlay}>
+          <div
+            className={addColumnStyles.confirmDialog}
+            style={{ height: '15.5rem' }}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="overwrite-confirm-title"
+            aria-describedby="overwrite-confirm-description"
+          >
+            <div className={addColumnStyles.confirmHeader}>
+              <h3 id="overwrite-confirm-title" className={addColumnStyles.confirmTitle}>
+                Alert
+              </h3>
+              <button
+                type="button"
+                className={addColumnStyles.confirmCloseBtn}
+                aria-label="Close"
+                onClick={() => setShowOverwriteConfirm(false)}
               >
-                This operation may overwrite the existing content in this column. Do you
-                want to continue?
-              </div>
-              <div className={addColumnStyles.confirmActions}>
-                <button
-                  type="button"
-                  className={addColumnStyles.confirmCancelBtn}
-                  onClick={() => setShowOverwriteConfirm(false)}
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className={addColumnStyles.confirmDiscardBtn}
-                  style={{ background: '#0B99FF' }}
-                  onClick={async () => {
-                    setShowOverwriteConfirm(false);
-                    await handleSubmit();
-                  }}
-                >
-                  Overwrite
-                </button>
-              </div>
+                  <path
+                    d="M12 4L4 12M4 4l8 8"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
-          </div>,
-          document.body,
-        )
+            <div
+              id="overwrite-confirm-description"
+              className={addColumnStyles.confirmBody}
+            >
+              This operation may overwrite the existing content in this column. Do you
+              want to continue?
+            </div>
+            <div className={addColumnStyles.confirmActions}>
+              <button
+                type="button"
+                className={addColumnStyles.confirmCancelBtn}
+                onClick={() => setShowOverwriteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={addColumnStyles.confirmDiscardBtn}
+                style={{ background: '#0B99FF' }}
+                onClick={async () => {
+                  setShowOverwriteConfirm(false);
+                  await handleSubmit();
+                }}
+              >
+                Overwrite
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )
       : null;
 
   return (
