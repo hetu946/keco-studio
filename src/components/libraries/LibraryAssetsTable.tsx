@@ -59,6 +59,7 @@ import { AddNewRowForm } from './components/AddNewRowForm';
 import { AddColumnModal, type AddColumnFormPayload } from './components/AddColumnModal';
 import { FormulaCellPanel } from './components/FormulaCellPanel';
 import { FormulaCell } from './components/FormulaCell';
+import { TableCellFindReplace } from './components/TableCellFindReplace';
 import assetTableIcon from '@/assets/images/AssetTableIcon.svg';
 import libraryAssetTableAddIcon from '@/assets/images/LibraryAssetTableAddIcon.svg';
 import libraryAssetTableSelectIcon from '@/assets/images/LibraryAssetTableSelectIcon2.svg';
@@ -1147,65 +1148,116 @@ export function LibraryAssetsTable({
     }
   };
 
+  const handleTableFindHighlightCells = useCallback(
+    (cells: Array<{ assetId: string; fieldId: string }>) => {
+      setSearchHighlightedCells(cells);
+    },
+    []
+  );
+
+  const handleTableFindClearHighlight = useCallback(() => {
+    clearSearchCellHighlight();
+  }, [clearSearchCellHighlight]);
+
+  const handleTableFindFocusSection = useCallback(
+    (sectionId: string) => {
+      if (!sectionId || !groups.some((g) => g.section.id === sectionId)) return;
+      setActiveSectionId(sectionId);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(sectionStateStorageKey, sectionId);
+      }
+    },
+    [groups, sectionStateStorageKey]
+  );
+
+  const handleTableFindScrollToCell = useCallback((assetId: string, fieldId: string) => {
+    setTimeout(() => {
+      const el = document.querySelector(
+        `tr[data-row-id="${assetId}"] td[data-property-key="${fieldId}"]`
+      ) as HTMLElement | null;
+      el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    }, 0);
+  }, []);
+
+  const getTableFindAccessToken = useCallback(async () => {
+    const sessionRes = await supabase.auth.getSession();
+    return sessionRes.data?.session?.access_token;
+  }, [supabase]);
+
   return (
     <>
       <div className={styles.tableShell}>
-        {hasSections && (
-          <div className={styles.sectionTabs}>
-            {groups.map((group) => (
-              editingSectionId === group.section.id ? (
-                <div key={group.section.id} className={styles.sectionTabEdit}>
-                  <Input
-                    ref={sectionInputRef}
-                    value={editingSectionName}
-                    onChange={(e) => setEditingSectionName(e.target.value)}
-                    onBlur={() => handleSectionEditEnd(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSectionEditEnd(true);
-                      if (e.key === 'Escape') handleSectionEditEnd(false);
+        <div className={styles.tableTopBar}>
+          {hasSections ? (
+            <div className={styles.sectionTabs}>
+              {groups.map((group) => (
+                editingSectionId === group.section.id ? (
+                  <div key={group.section.id} className={styles.sectionTabEdit}>
+                    <Input
+                      ref={sectionInputRef}
+                      value={editingSectionName}
+                      onChange={(e) => setEditingSectionName(e.target.value)}
+                      onBlur={() => handleSectionEditEnd(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSectionEditEnd(true);
+                        if (e.key === 'Escape') handleSectionEditEnd(false);
+                      }}
+                      className={styles.sectionTabInput}
+                      size="small"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    key={group.section.id}
+                    type="button"
+                    className={`${styles.sectionTab} ${effectiveActiveSectionId === group.section.id ? styles.sectionTabActive : ''}`}
+                    onClick={() => setActiveSectionId(group.section.id)}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      handleSectionEditStart(group.section.id, group.section.name);
                     }}
-                    className={styles.sectionTabInput}
-                    size="small"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-              ) : (
-                <button
-                  key={group.section.id}
-                  type="button"
-                  className={`${styles.sectionTab} ${effectiveActiveSectionId === group.section.id ? styles.sectionTabActive : ''}`}
-                  onClick={() => setActiveSectionId(group.section.id)}
-                  onDoubleClick={(e) => {
-                    e.preventDefault();
-                    handleSectionEditStart(group.section.id, group.section.name);
-                  }}
-                >
-                  {group.section.name}
-                </button>
-              )
-            ))}
+                  >
+                    {group.section.name}
+                  </button>
+                )
+              ))}
 
-            <button
-              type="button"
-              className={styles.addSectionButton}
-              onClick={async () => {
-                if (!onAddSection) return;
-                try {
-                  const newSectionId = await onAddSection();
-                  if (newSectionId) {
-                    pendingNewSectionIdRef.current = newSectionId;
-                    setActiveSectionId(newSectionId);
+              <button
+                type="button"
+                className={styles.addSectionButton}
+                onClick={async () => {
+                  if (!onAddSection) return;
+                  try {
+                    const newSectionId = await onAddSection();
+                    if (newSectionId) {
+                      pendingNewSectionIdRef.current = newSectionId;
+                      setActiveSectionId(newSectionId);
+                    }
+                  } catch (e) {
+                    message.error((e as Error)?.message ?? 'Failed to add section');
                   }
-                } catch (e) {
-                  message.error((e as Error)?.message ?? 'Failed to add section');
-                }
-              }}
-              aria-label="Add section"
-            >
-              <Image src={addSectionIcon} alt="Add section" width={16} height={16} />
-            </button>
-          </div>
-        )}
+                }}
+                aria-label="Add section"
+              >
+                <Image src={addSectionIcon} alt="Add section" width={16} height={16} />
+              </button>
+            </div>
+          ) : (
+            <div />
+          )}
+          <TableCellFindReplace
+            libraryId={library?.id}
+            rows={resolvedRows}
+            properties={orderedProperties}
+            canReplace={userRole === 'admin' || userRole === 'editor'}
+            getAccessToken={getTableFindAccessToken}
+            onHighlightCells={handleTableFindHighlightCells}
+            onClearHighlight={handleTableFindClearHighlight}
+            onFocusSection={hasSections ? handleTableFindFocusSection : undefined}
+            scrollToCell={handleTableFindScrollToCell}
+          />
+        </div>
         <div className={styles.tableContainer} ref={tableContainerRef}>
           <table className={`${styles.table} ${getColumnWidthClass()}`}>
             <TableHeader
