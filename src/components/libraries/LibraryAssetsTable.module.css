@@ -73,7 +73,24 @@
   border: 1px solid #0000003D;
   background: #ffffff;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.tableTopBar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-height: 2.75rem;
+}
+
+.tableTopBar .sectionTabs {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+  border-bottom: none;
 }
 
 .tableContainer {

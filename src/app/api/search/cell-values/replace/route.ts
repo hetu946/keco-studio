@@ -15,6 +15,7 @@ type ReplaceBody = {
   mode?: 'single' | 'all';
   assetId?: string;
   fieldId?: string;
+  libraryId?: string;
   dryRun?: boolean;
 };
 
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
   const replace = body.replace ?? '';
   const mode = body.mode === 'single' ? 'single' : 'all';
   const dryRun = Boolean(body.dryRun);
+  const libraryIdFilter = (body.libraryId ?? '').trim() || null;
 
   if (!find) {
     return NextResponse.json({ error: 'find is required' }, { status: 400 });
@@ -118,6 +120,9 @@ export async function POST(req: Request) {
     }
 
     targets = (searchRows ?? []) as SearchRow[];
+    if (libraryIdFilter) {
+      targets = targets.filter((t) => t.library_id === libraryIdFilter);
+    }
   }
 
   if (targets.length === 0) {
