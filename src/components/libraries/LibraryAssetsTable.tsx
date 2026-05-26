@@ -69,6 +69,7 @@ import collaborationViewNumIcon from '@/assets/images/collaborationViewNumIcon.s
 import addSectionIcon from '@/assets/images/addProjectIcon.svg'
 import styles from './LibraryAssetsTable.module.css';
 import { useFormulaCellCustomization } from './hooks/useFormulaCellCustomization';
+import { useTableResize, NUMBER_COLUMN_KEY } from './hooks/useTableResize';
 import { evaluateFormulaForRow, getCustomFormulaExpressionFromCellValue } from './utils/formulaEvaluation';
 
 export type LibraryAssetsTableProps = {
@@ -541,6 +542,20 @@ export function LibraryAssetsTable({
     [groups, effectiveActiveSectionId]
   );
   const activeProperties = activeGroup ? activeGroup.properties : orderedProperties;
+  const resizeColumnKeys = useMemo(
+    () => [NUMBER_COLUMN_KEY, ...activeProperties.map((property) => property.id)],
+    [activeProperties],
+  );
+  const {
+    getColStyle,
+    getRowHeightStyle,
+    hasCustomRowHeight,
+    hasCustomColumnWidths,
+    startColumnResize,
+    startRowResize,
+    isResizingColumn,
+    isResizingRow,
+  } = useTableResize(library?.id, resizeColumnKeys);
   const [searchHighlightedCells, setSearchHighlightedCells] = useState<
     Array<{ assetId: string; fieldId: string }>
   >([]);
@@ -1258,8 +1273,22 @@ export function LibraryAssetsTable({
             scrollToCell={handleTableFindScrollToCell}
           />
         </div>
-        <div className={styles.tableContainer} ref={tableContainerRef}>
-          <table className={`${styles.table} ${getColumnWidthClass()}`}>
+        <div
+          className={`${styles.tableContainer} ${isResizingColumn || isResizingRow ? styles.tableResizing : ''}`}
+          ref={tableContainerRef}
+        >
+          <table
+            className={`${styles.table} ${hasCustomColumnWidths || isResizingColumn ? styles.colsCustom : getColumnWidthClass()}`}
+          >
+            <colgroup>
+              <col style={getColStyle(NUMBER_COLUMN_KEY)} />
+              {activeProperties.map((property) => (
+                <col key={property.id} style={getColStyle(property.id)} />
+              ))}
+              {(userRole === 'admin' || userRole === 'editor') && (
+                <col style={{ width: 40 }} />
+              )}
+            </colgroup>
             <TableHeader
               groups={hasSections && activeGroup ? [activeGroup] : groups}
               allRowsSelected={headerAllRowsSelected}
@@ -1270,6 +1299,8 @@ export function LibraryAssetsTable({
               showAddColumn={userRole === 'admin' || userRole === 'editor'}
               onAddColumnClick={handleAddColumnClick}
               addColumnButtonRef={addColumnButtonRef}
+              onColumnResizeStart={startColumnResize}
+              isResizingColumn={isResizingColumn}
             />
             <tbody className={styles.body}>
               {resolvedRows.map((row, index) => {
@@ -1282,7 +1313,8 @@ export function LibraryAssetsTable({
                   <tr
                     key={row.id}
                     data-row-id={row.id}
-                    className={`${styles.row} ${isRowSelected ? styles.rowSelected : ''}`}
+                    className={`${styles.row} ${isRowSelected ? styles.rowSelected : ''} ${hasCustomRowHeight(row.id) ? styles.rowCustomHeight : ''}`}
+                    style={getRowHeightStyle(row.id)}
                     onContextMenu={(e) => {
                       handleRowContextMenu(e, row);
                     }}
@@ -1306,6 +1338,20 @@ export function LibraryAssetsTable({
                       ) : (
                         <span>{index + 1}</span>
                       )}
+                      <div
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label="Resize row"
+                        className={`${styles.rowResizeHandle} ${isResizingRow ? styles.rowResizeHandleActive : ''}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const tr = e.currentTarget.closest('tr') as HTMLElement | null;
+                          if (tr) {
+                            startRowResize(row.id, e.clientY, tr);
+                          }
+                        }}
+                      />
                     </td>
                     {activeProperties.map((property) => {
                       const globalPropertyIndex = orderedProperties.findIndex((p) => p.id === property.id);

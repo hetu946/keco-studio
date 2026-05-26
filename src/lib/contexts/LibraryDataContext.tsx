@@ -145,7 +145,7 @@ async function touchLibraryUpdatedAt(
 
 export function LibraryDataProvider({ children, libraryId, projectId }: LibraryDataProviderProps) {
   const supabase = useSupabase();
-  const { userProfile } = useAuth();
+  const { userProfile, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   // Yjs setup - shared data structure
   const yDoc = useMemo(() => new Y.Doc(), [libraryId]);
@@ -224,7 +224,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
 
   // Load initial data from database (can be reused after restore)
   const loadInitialData = useCallback(async () => {
-    if (!libraryId) return;
+    if (!libraryId || !isAuthenticated || !userProfile) return;
 
     setIsLoading(true);
 
@@ -265,7 +265,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     } finally {
       setIsLoading(false);
     }
-  }, [libraryId, supabase, yDoc, yAssets]);
+  }, [libraryId, isAuthenticated, userProfile, supabase, yDoc, yAssets]);
 
   // Restore 后直接用 snapshot 覆盖 Yjs，保证「当前视图 = 刚恢复的版本」，与创建版本用 Yjs 一致
   const applySnapshotToYjs = useCallback((snapshotData: { assets?: Array<{ id: string; name?: string; propertyValues?: Record<string, any>; createdAt?: string; rowIndex?: number | null }> }) => {
@@ -292,10 +292,11 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     });
   }, [yDoc, yAssets]);
 
-  // Initial load
+  // Initial load (wait for auth so RLS-backed queries have a valid session)
   useEffect(() => {
+    if (isAuthLoading || !isAuthenticated || !userProfile) return;
     loadInitialData();
-  }, [loadInitialData]);
+  }, [loadInitialData, isAuthLoading, isAuthenticated, userProfile]);
 
   // IndexedDB persistence — after restore, overwrite with DB so collaborative view matches server (fixes 44 vs 28 row mismatch)
   useEffect(() => {

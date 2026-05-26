@@ -274,9 +274,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.6;
   }
@@ -588,36 +591,66 @@
   background: #BFBFBF;
 }
 
-/* Projects section with scrolling */
+/* Projects section: max 3 rows visible; Edge-style scrollbar when more than 3 */
 .projectsListContainer {
-  max-height: 9rem; /* Height for 3 projects (48px each + 3px gap * 2) */
-  overflow-y: auto;
+  max-height: 9rem;
+  /* Height for 3 projects (48px each) */
   overflow-x: hidden;
+  overflow-y: hidden;
   margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
-/* Custom scrollbar for projects list */
-.projectsListContainer::-webkit-scrollbar {
-  width: 0.25rem;
+/* Edge-style: slim track + pill thumb + arrow buttons (Chromium webkit only; avoid scrollbar-width: auto) */
+.projectsListContainer.projectsListContainerScrollable {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 
-.projectsListContainer::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 7px;
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar {
+  width: 8px;
 }
 
-.projectsListContainer::-webkit-scrollbar-thumb {
-  background: #D9D9D9;
-  border-radius: 7px;
-  height: 60px;
-  min-height: 60px;
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
 }
 
-.projectsListContainer::-webkit-scrollbar-thumb:hover {
-  background: #BFBFBF;
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar-thumb {
+  background: #c4c4c4;
+  border-radius: 9999px;
+  border: 2px solid #f0f0f0;
+  min-height: 20px;
+}
+
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}
+
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar-button {
+  display: block;
+  height: 12px;
+  width: 8px;
+  background-color: #f0f0f0;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar-button:vertical:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 10 6'%3E%3Cpath fill='%23bdbdbd' d='M5 0 10 6H0z'/%3E%3C/svg%3E");
+}
+
+.projectsListContainer.projectsListContainerScrollable::-webkit-scrollbar-button:vertical:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 10 6'%3E%3Cpath fill='%23bdbdbd' d='M5 6 10 0H0z'/%3E%3C/svg%3E");
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .projectsListContainer.projectsListContainerScrollable {
+    scrollbar-width: thin;
+    scrollbar-color: #c4c4c4 #f0f0f0;
+  }
 }
 
 .treeWrapper {
@@ -693,8 +726,10 @@
   min-width: 0;
   box-sizing: border-box;
   padding-left: 0;
-  width: 0; /* Force flex to calculate width correctly */
-  position: relative; /* Provide positioning context for absolutely positioned itemActions */
+  width: 0;
+  /* Force flex to calculate width correctly */
+  position: relative;
+  /* Provide positioning context for absolutely positioned itemActions */
 }
 
 /* Add left padding to leaf nodes (library and create button) to align with folder icon */
@@ -713,9 +748,12 @@
 
 /* Ensure add-asset nodes have minimum width to prevent text from appearing word by word */
 .tree :global(.ant-tree-treenode[data-node-key*="add-asset-"]) .ant-tree-node-content-wrapper {
-  min-width: 120px !important; /* Ensure enough width for "Add New Asset" text */
-  width: auto !important; /* Override width: 0 to prevent word-by-word appearance */
-  transition: none !important; /* Disable transition to prevent word-by-word appearance */
+  min-width: 120px !important;
+  /* Ensure enough width for "Add New Asset" text */
+  width: auto !important;
+  /* Override width: 0 to prevent word-by-word appearance */
+  transition: none !important;
+  /* Disable transition to prevent word-by-word appearance */
 }
 
 /* Disable Ant Design Tree's internal animation for add-asset nodes */
@@ -816,7 +854,8 @@
 
 
 .tree :global(.ant-tree-indent-unit) {
-  width: 1rem; /* 为文件夹下的子节点（library）添加缩进 */
+  width: 1rem;
+  /* 为文件夹下的子节点（library）添加缩进 */
 }
 
 /* Hide expand/collapse icon for library nodes (isLeaf: true) */
@@ -912,7 +951,7 @@
 }
 
 .itemActive {
-  background-color: #0B99FF14;
+  background-color: #e6f4ff;
   color: #070707;
 }
 
@@ -954,7 +993,8 @@
   white-space: nowrap;
   font-size: 1rem;
   font-weight: 500;
-  padding-right: 2rem; /* Reserve space for delete button to avoid text overlap */
+  padding-right: 2rem;
+  /* Reserve space for delete button to avoid text overlap */
 }
 
 /* Inline rename input: match row height and itemText appearance, minimal border */
@@ -1006,7 +1046,8 @@
 /* Total distance from sidebar right edge = 0.75rem (item margin) + 0.75rem (right offset) = 1.5rem */
 .item .itemActions {
   position: absolute;
-  right: 0.75rem; /* 0.75rem from item right edge, 1.5rem from sidebar right edge (0.75rem margin + 0.75rem right) */
+  right: 0.75rem;
+  /* 0.75rem from item right edge, 1.5rem from sidebar right edge (0.75rem margin + 0.75rem right) */
   top: 50%;
   transform: translateY(-50%);
   margin-left: 0;
@@ -1023,7 +1064,8 @@
 
 .tree :global(.ant-tree-node-content-wrapper) .itemActions {
   position: absolute;
-  right: 0.75rem; /* 0.75rem from content-wrapper right edge, 1.5rem from sidebar right edge (0.75rem margin + 0.75rem right) */
+  right: 0.75rem;
+  /* 0.75rem from content-wrapper right edge, 1.5rem from sidebar right edge (0.75rem margin + 0.75rem right) */
   top: 50%;
   transform: translateY(-50%);
   margin-left: 0;
@@ -1113,7 +1155,8 @@
   display: flex;
   align-items: center;
   margin: 0;
-  padding-left: 0; /* 🎯 尝试调整按钮本身的 padding */
+  padding-left: 0;
+  /* 🎯 尝试调整按钮本身的 padding */
   box-sizing: border-box;
 }
 
@@ -1175,21 +1218,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex-shrink: 0; /* Prevent text from shrinking during animation */
+  flex-shrink: 0;
+  /* Prevent text from shrinking during animation */
 }
 
 /* Ensure itemMain in add-asset nodes has enough width to display text fully */
 .tree :global(.ant-tree-treenode[data-node-key*="add-asset-"]) .itemMain {
-  min-width: max-content !important; /* Ensure text displays fully without word-by-word appearance */
-  width: auto !important; /* Override any width constraints */
-  overflow: visible !important; /* Ensure text is not clipped during animation */
+  min-width: max-content !important;
+  /* Ensure text displays fully without word-by-word appearance */
+  width: auto !important;
+  /* Override any width constraints */
+  overflow: visible !important;
+  /* Ensure text is not clipped during animation */
 }
 
 /* Ensure itemAddText in add-asset nodes renders immediately with full width */
 .tree :global(.ant-tree-treenode[data-node-key*="add-asset-"]) .itemAddText {
   min-width: max-content !important;
   width: auto !important;
-  display: inline-block !important; /* Ensure text renders as a single unit */
+  display: inline-block !important;
+  /* Ensure text renders as a single unit */
 }
 
 /* Folder row: show add-library icon when whole row is hovered or when folder is selected */
@@ -1259,8 +1307,10 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
-  min-width: 0; /* Allow flex item to shrink below content size */
-  overflow: hidden; /* Enable text truncation */
+  min-width: 0;
+  /* Allow flex item to shrink below content size */
+  overflow: hidden;
+  /* Enable text truncation */
 }
 
 /* Text ellipsis for predefine item */
@@ -1269,7 +1319,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  min-width: 0; /* Allow text to shrink */
+  min-width: 0;
+  /* Allow text to shrink */
 }
 
 /* Library item active state (when on library page) */
@@ -1309,7 +1360,8 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-top: 0 !important; /* Remove margin-top, use margin-bottom on createButton instead */
+  margin-top: 0 !important;
+  /* Remove margin-top, use margin-bottom on createButton instead */
 }
 
 .assetList .itemRow {
@@ -1325,19 +1377,26 @@
 
 /* Aligned create button for asset page (aligned with back button) */
 .createButtonAligned {
-  padding: 0.5rem 12px!important; /* Same padding as asset list items for consistent height, with 16px left indent */
-  height: 2.5rem !important; /* Fixed height to match asset items exactly */
-  min-height: 2.5rem !important; /* Same height as asset list items */
+  padding: 0.5rem 12px !important;
+  /* Same padding as asset list items for consistent height, with 16px left indent */
+  height: 2.5rem !important;
+  /* Fixed height to match asset items exactly */
+  min-height: 2.5rem !important;
+  /* Same height as asset list items */
   display: flex !important;
-  align-items: center !important; /* Vertical center content */
+  align-items: center !important;
+  /* Vertical center content */
   box-sizing: border-box !important;
-  margin: 0 !important; /* Remove all margins */
+  margin: 0 !important;
+  /* Remove all margins */
 }
 
 /* Adjust icon position to align with library back button */
 .createButtonAligned .createButtonText {
-  margin-left: 0 !important; /* Remove any default margin */
-  padding-left: 0 !important; /* Remove any default padding */
+  margin-left: 0 !important;
+  /* Remove any default margin */
+  padding-left: 0 !important;
+  /* Remove any default padding */
 }
 
 /* The icon should align with the back button which is at position: 
