@@ -13,6 +13,7 @@ import { queryKeys } from '@/lib/utils/queryKeys';
 import { showErrorToast, showSuccessToast } from '@/lib/utils/toast';
 import { getFieldTypeIcon, FIELD_TYPE_OPTIONS } from '@/app/(dashboard)/[projectId]/[libraryId]/predefine/utils';
 import { EditColumnModal } from './EditColumnModal';
+import { NUMBER_COLUMN_KEY } from '../hooks/useTableResize';
 import styles from '@/components/libraries/LibraryAssetsTable.module.css';
 import showIcon from '@/assets/images/showIcon.svg';
 import addColumIcon from '@/assets/images/addColumIcon.svg';
@@ -81,6 +82,32 @@ export type TableHeaderGroup = {
   properties: PropertyConfig[];
 };
 
+function ColumnResizeHandle({
+  columnKey,
+  onColumnResizeStart,
+  isResizingColumn,
+}: {
+  columnKey: string;
+  onColumnResizeStart?: (columnKey: string, clientX: number, element: HTMLElement) => void;
+  isResizingColumn?: boolean;
+}) {
+  if (!onColumnResizeStart) return null;
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize column"
+      className={`${styles.columnResizeHandle} ${isResizingColumn ? styles.columnResizeHandleActive : ''}`}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onColumnResizeStart(columnKey, e.clientX, e.currentTarget.parentElement as HTMLElement);
+      }}
+    />
+  );
+}
+
 export type TableHeaderProps = {
   groups: TableHeaderGroup[];
   allRowsSelected: boolean;
@@ -96,6 +123,10 @@ export type TableHeaderProps = {
   onAddColumnClick?: () => void;
   /** Ref for the add column button (used to position the popup below it) */
   addColumnButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  /** Start dragging a column resize handle */
+  onColumnResizeStart?: (columnKey: string, clientX: number, element: HTMLElement) => void;
+  /** Whether a column is currently being resized */
+  isResizingColumn?: boolean;
 };
 
 export function TableHeader({
@@ -108,6 +139,8 @@ export function TableHeader({
   showAddColumn = false,
   onAddColumnClick,
   addColumnButtonRef,
+  onColumnResizeStart,
+  isResizingColumn = false,
 }: TableHeaderProps) {
   const supabase = useSupabase();
   const params = useParams();
@@ -237,6 +270,11 @@ export function TableHeader({
                 onChange={(e) => onToggleSelectAll(e.target.checked)}
               />
             </div>
+            <ColumnResizeHandle
+              columnKey={NUMBER_COLUMN_KEY}
+              onColumnResizeStart={onColumnResizeStart}
+              isResizingColumn={isResizingColumn}
+            />
           </th>
           {groups.map((group, index) => (
             <th
@@ -265,6 +303,11 @@ export function TableHeader({
               />
             </div>
           )}
+          <ColumnResizeHandle
+            columnKey={NUMBER_COLUMN_KEY}
+            onColumnResizeStart={onColumnResizeStart}
+            isResizingColumn={isResizingColumn}
+          />
         </th>
         {groups.map((group) =>
           group.properties.map((property) => (
@@ -336,6 +379,11 @@ export function TableHeader({
                   </div>
                 </div>
               </div>
+              <ColumnResizeHandle
+                columnKey={property.id}
+                onColumnResizeStart={onColumnResizeStart}
+                isResizingColumn={isResizingColumn}
+              />
             </th>
           )),
         )}

@@ -204,7 +204,12 @@ export async function verifyLibraryAccess(
       .single();
     
     if (libraryError || !library) {
-      throw new AuthorizationError('Library not found');
+      const detail = libraryError?.code === 'PGRST116'
+        ? 'Library not found'
+        : libraryError?.message
+          ? `Library not found: ${libraryError.message}`
+          : 'Library not found';
+      throw new AuthorizationError(detail);
     }
     
     // Verify project access (owner or collaborator)

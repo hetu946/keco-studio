@@ -52,6 +52,8 @@ export function SidebarProjectsList({
     [userRole]
   );
 
+  const isProjectsScrollable = projects.length > 3;
+
   const saveRename = useCallback(
     async (projectId: string) => {
       if (isSaving) return;
@@ -89,7 +91,10 @@ export function SidebarProjectsList({
           />
         </button>
       </div>
-      <div className={styles.projectsListContainer}>
+      <div
+        className={`${styles.projectsListContainer} ${isProjectsScrollable ? styles.projectsListContainerScrollable : ''
+          }`}
+      >
         {projects.map((project) => {
           const isEditing = editingProjectId === project.id;
           const isCurrentProject = currentProjectId === project.id;
@@ -100,13 +105,12 @@ export function SidebarProjectsList({
           return (
             <div
               key={project.id}
-              className={`${styles.item} ${
-                isActive 
-                  ? styles.itemActive 
-                  : isSecondaryActive 
-                  ? styles.itemSecondaryActive 
-                  : styles.itemInactive
-              }`}
+              className={`${styles.item} ${isActive
+                  ? styles.itemActive
+                  : isSecondaryActive
+                    ? styles.itemSecondaryActive
+                    : styles.itemInactive
+                }`}
               onClick={() => {
                 if (isEditing) return;
                 onProjectClick(project.id);
