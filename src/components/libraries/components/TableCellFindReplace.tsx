@@ -285,7 +285,8 @@ export function TableCellFindReplace({
         ) : replacePreview ? (
           <div>
             <p>
-              Find &quot;{findText.trim()}&quot; to Replace with &quot;{replaceText}&quot;
+              Cells containing &quot;{findText.trim()}&quot; will have their value set to &quot;
+              {replaceText}&quot;.
             </p>
             <p>
               {replacePreview.updated} cell(s) will be updated, {replacePreview.skipped} skipped.
@@ -294,7 +295,7 @@ export function TableCellFindReplace({
               <ul className={styles.previewList}>
                 {replacePreview.previews.slice(0, 5).map((item, index) => (
                   <li key={`preview-${index}`}>
-                    <strong>{item.fieldLabel}</strong>: &quot;{item.beforeDisplay}&quot; to &quot;
+                    <strong>{item.fieldLabel}</strong>: &quot;{item.beforeDisplay}&quot; → &quot;
                     {item.afterDisplay}&quot;
                   </li>
                 ))}
@@ -310,7 +311,8 @@ export function TableCellFindReplace({
               </ul>
             )}
             <p className={styles.hint}>
-              Only cell values in this table are replaced. Types are validated before save.
+              The full cell value is replaced, not just the matched text. Types are validated
+              before save.
             </p>
           </div>
         ) : null}

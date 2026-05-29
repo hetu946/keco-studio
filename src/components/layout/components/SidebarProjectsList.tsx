@@ -74,7 +74,7 @@ export function SidebarProjectsList({
   );
 
   return (
-    <>
+    <div className={styles.projectsSection}>
       <div className={styles.sectionTitle}>
         <span>Projects</span>
         <button
@@ -106,10 +106,10 @@ export function SidebarProjectsList({
             <div
               key={project.id}
               className={`${styles.item} ${isActive
-                  ? styles.itemActive
-                  : isSecondaryActive
-                    ? styles.itemSecondaryActive
-                    : styles.itemInactive
+                ? styles.itemActive
+                : isSecondaryActive
+                  ? styles.itemSecondaryActive
+                  : styles.itemInactive
                 }`}
               onClick={() => {
                 if (isEditing) return;
@@ -207,6 +207,6 @@ export function SidebarProjectsList({
           </button>
         )}
       </div>
-    </>
+    </div>
   );
 }

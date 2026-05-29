@@ -177,6 +177,87 @@ const normalizeValue = (input: unknown): any => {
   return value;
 };
 
+export async function getBooleanFieldIdsByLibraryId(
+  supabase: SupabaseClient,
+  libraryId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('library_field_definitions')
+    .select('id')
+    .eq('library_id', libraryId)
+    .eq('data_type', 'boolean');
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.id as string);
+}
+
+/** Missing boolean cells default to false (matches table UI and search). */
+export function applyBooleanFieldDefaults(
+  propertyValues: Record<string, any>,
+  booleanFieldIds: string[]
+): Record<string, any> {
+  if (booleanFieldIds.length === 0) return propertyValues;
+
+  const merged = { ...propertyValues };
+  for (const fieldId of booleanFieldIds) {
+    const current = merged[fieldId];
+    if (current === null || current === undefined || !(fieldId in merged)) {
+      merged[fieldId] = false;
+    }
+  }
+  return merged;
+}
+
+export async function backfillBooleanFieldDefaults(
+  supabase: SupabaseClient,
+  libraryId: string,
+  fieldId?: string
+): Promise<void> {
+  const booleanFieldIds = fieldId
+    ? [fieldId]
+    : await getBooleanFieldIdsByLibraryId(supabase, libraryId);
+  if (booleanFieldIds.length === 0) return;
+
+  const { data: assets, error: assetsError } = await supabase
+    .from('library_assets')
+    .select('id')
+    .eq('library_id', libraryId);
+
+  if (assetsError) throw assetsError;
+  if (!assets || assets.length === 0) return;
+
+  const assetIds = assets.map((row) => row.id as string);
+  const { data: existing, error: existingError } = await supabase
+    .from('library_asset_values')
+    .select('asset_id, field_id')
+    .in('asset_id', assetIds)
+    .in('field_id', booleanFieldIds);
+
+  if (existingError) throw existingError;
+
+  const existingKeys = new Set(
+    (existing ?? []).map((row) => `${row.asset_id}:${row.field_id}`)
+  );
+
+  const rows: Array<{ asset_id: string; field_id: string; value_json: boolean }> = [];
+  for (const assetId of assetIds) {
+    for (const booleanFieldId of booleanFieldIds) {
+      const key = `${assetId}:${booleanFieldId}`;
+      if (!existingKeys.has(key)) {
+        rows.push({ asset_id: assetId, field_id: booleanFieldId, value_json: false });
+      }
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  const { error: upsertError } = await supabase
+    .from('library_asset_values')
+    .upsert(rows, { onConflict: 'asset_id,field_id' });
+
+  if (upsertError) throw upsertError;
+}
+
 async function getFormulaFieldMetaByLibraryId(
   supabase: SupabaseClient,
   libraryId: string
@@ -527,6 +608,10 @@ export async function addLibraryField(
     await recalculateAndPersistFormulaFieldValues(supabase, libraryId, inserted.id);
   }
 
+  if (payload.dataType === 'boolean') {
+    await backfillBooleanFieldDefaults(supabase, libraryId, inserted.id);
+  }
+
   const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   globalRequestCache.invalidate(`field-definitions:${libraryId}`);
   await touchLibraryUpdatedAt(supabase, libraryId);
@@ -688,7 +773,11 @@ export async function createAsset(
   await verifyAssetCreationPermission(supabase, libraryId);
 
   const formulaMeta = await getFormulaFieldMetaByLibraryId(supabase, libraryId);
-  const mergedPropertyValues = mergeFormulaValuesPreservingCustom(formulaMeta, propertyValues);
+  const booleanFieldIds = await getBooleanFieldIdsByLibraryId(supabase, libraryId);
+  const mergedPropertyValues = applyBooleanFieldDefaults(
+    mergeFormulaValuesPreservingCustom(formulaMeta, propertyValues),
+    booleanFieldIds
+  );
 
   // Step 1: Insert the asset
   const insertData: {
@@ -724,7 +813,10 @@ export async function createAsset(
   // Step 2: Insert property values
   if (Object.keys(mergedPropertyValues).length > 0) {
     const valueRows = Object.entries(mergedPropertyValues)
-      .filter(([_, value]) => value !== null && value !== undefined && value !== '')
+      .filter(
+        ([_, value]) =>
+          value !== null && value !== undefined && (typeof value === 'boolean' || value !== '')
+      )
       .map(([fieldId, value]) => ({
         asset_id: assetId,
         field_id: fieldId,

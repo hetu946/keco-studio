@@ -26,7 +26,7 @@ import { usePresenceTracking } from '@/lib/hooks/usePresenceTracking';
 import type { AssetRow, PropertyConfig } from '@/lib/types/libraryAssets';
 import type { CellUpdateEvent, AssetCreateEvent, AssetDeleteEvent, PresenceState, CellsBatchUpdateEvent } from '@/lib/types/collaboration';
 import { serializeError } from '@/lib/utils/errorUtils';
-import { getLibraryAssetsWithProperties } from '@/lib/services/libraryAssetsService';
+import { getLibraryAssetsWithProperties, applyBooleanFieldDefaults, getBooleanFieldIdsByLibraryId } from '@/lib/services/libraryAssetsService';
 import {
   syncReferencesForSourceChanges,
   type ReferenceCellUpdate,
@@ -861,6 +861,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     }
 
     const formulaMeta = await getFormulaFieldMeta();
+    const booleanFieldIds = await getBooleanFieldIdsByLibraryId(supabase, libraryId);
     const rawComputedFormulaValues = computeFormulaValuesForRow(
       formulaMeta.map((field) => ({
         id: field.id,
@@ -881,6 +882,10 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
         mergedPropertyValues[fieldId] = rawComputedFormulaValues[fieldId];
       }
     }
+    const valuesWithBooleanDefaults = applyBooleanFieldDefaults(
+      mergedPropertyValues,
+      booleanFieldIds
+    );
 
     // 1. Create in database
     const { data: newAsset, error: assetError } = await supabase
@@ -908,7 +913,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     }
 
     // 2. Insert field values
-    const fieldValues = Object.entries(mergedPropertyValues).map(([fieldId, value]) => ({
+    const fieldValues = Object.entries(valuesWithBooleanDefaults).map(([fieldId, value]) => ({
       asset_id: assetId,
       field_id: fieldId,
       value_json: value,
@@ -935,7 +940,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
 
       // Create Y.Map for propertyValues
       const yPropertyValues = new Y.Map();
-      Object.entries(mergedPropertyValues).forEach(([fieldId, value]) => {
+      Object.entries(valuesWithBooleanDefaults).forEach(([fieldId, value]) => {
         // For complex objects, use deep copy to avoid reference issues
         let valueForYjs = value;
         if (value !== null && typeof value === 'object') {
@@ -957,7 +962,7 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     // so collaborators start their DB query in parallel with ours (~1× instead of ~2× delay).
     if (realtimeConfig) {
       if (typeof options?.rowIndex !== 'number') {
-        await broadcastAssetCreate(assetId, name, mergedPropertyValues, {
+        await broadcastAssetCreate(assetId, name, valuesWithBooleanDefaults, {
           insertAfterRowId: options?.insertAfterRowId,
           insertBeforeRowId: options?.insertBeforeRowId,
           targetCreatedAt: options?.createdAt?.toISOString(),
