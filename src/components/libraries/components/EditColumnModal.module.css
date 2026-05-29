@@ -189,11 +189,17 @@
 .dataTypeDropdown {
   display: flex;
   flex-direction: column;
-  max-height: 16.25rem;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.dataTypeOptionsList {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .dataTypeSearchWrap {
+  flex-shrink: 0;
   position: relative;
   display: flex;
   align-items: center;

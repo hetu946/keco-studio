@@ -9,6 +9,7 @@ export const REPLACEABLE_CELL_DATA_TYPES = new Set([
   'string',
   'int',
   'float',
+  'boolean',
   'enum',
   'date',
   'string_array',
@@ -67,6 +68,13 @@ export function normalizeValue(input: unknown): unknown {
 
 export function valueToDisplayString(value: unknown, dataType: string): string {
   const raw = normalizeValue(value);
+
+  if (dataType === 'boolean') {
+    return raw === true || raw === 'true' || String(raw).toLowerCase() === 'true'
+      ? 'true'
+      : 'false';
+  }
+
   if (raw === null || raw === undefined || raw === '') return '';
 
   if (dataType === 'int_array' || dataType === 'float_array') {
@@ -163,6 +171,17 @@ export function validateDisplayValue(
     return { isValid: true, normalizedValue: floatValue };
   }
 
+  if (dataType === 'boolean') {
+    const lower = trimmed.toLowerCase();
+    if (lower === 'true') {
+      return { isValid: true, normalizedValue: true };
+    }
+    if (lower === 'false') {
+      return { isValid: true, normalizedValue: false };
+    }
+    return { isValid: false, normalizedValue: null, error: 'type mismatch' };
+  }
+
   if (dataType === 'int_array' || dataType === 'float_array' || dataType === 'string_array') {
     let candidate = trimmed;
     if (candidate !== '' && (!candidate.startsWith('[') || !candidate.endsWith(']'))) {
@@ -245,8 +264,7 @@ export function findNormalizedMatchSpan(
 function applyReferenceValueReplace(
   currentValue: unknown,
   findTrimmed: string,
-  replace: string,
-  replaceAllInCell: boolean
+  replace: string
 ): {
   ok: true;
   newValue: unknown;
@@ -271,13 +289,9 @@ function applyReferenceValueReplace(
     if (!span) return sel;
 
     anyMatch = true;
-    const afterLabel = replaceAllInCell
-      ? replaceAllInDisplay(label, findTrimmed, replace)
-      : label.slice(0, span.start) + replace + label.slice(span.end);
-
-    if (afterLabel === label) return sel;
+    if (label === replace) return sel;
     anyChange = true;
-    return { ...sel, displayValue: afterLabel };
+    return { ...sel, displayValue: replace };
   });
 
   if (!anyMatch) {
@@ -306,11 +320,17 @@ export function replaceAllInDisplay(
   replace: string
 ): string {
   let result = display;
-  let span = findNormalizedMatchSpan(result, find);
+  let searchFrom = 0;
   let guard = 0;
-  while (span && guard < 10_000) {
-    result = result.slice(0, span.start) + replace + result.slice(span.end);
-    span = findNormalizedMatchSpan(result, find);
+  while (guard < 10_000) {
+    const span = findNormalizedMatchSpan(result.slice(searchFrom), find);
+    if (!span) break;
+
+    const start = searchFrom + span.start;
+    const end = searchFrom + span.end;
+    result = result.slice(0, start) + replace + result.slice(end);
+    // Advance past the inserted text so a replace that contains `find` is not re-matched.
+    searchFrom = replace.length > 0 ? start + replace.length : end;
     guard += 1;
   }
   return result;
@@ -321,7 +341,6 @@ export function applyCellValueReplace(params: {
   dataType: string;
   find: string;
   replace: string;
-  replaceAllInCell?: boolean;
 }): {
   ok: true;
   newValue: unknown;
@@ -331,7 +350,7 @@ export function applyCellValueReplace(params: {
   ok: false;
   error: string;
 } {
-  const { currentValue, dataType, find, replace, replaceAllInCell = true } = params;
+  const { currentValue, dataType, find, replace } = params;
 
   if (!REPLACEABLE_CELL_DATA_TYPES.has(dataType)) {
     return { ok: false, error: 'This field type does not support replace.' };
@@ -343,7 +362,7 @@ export function applyCellValueReplace(params: {
   }
 
   if (dataType === 'reference') {
-    return applyReferenceValueReplace(currentValue, findTrimmed, replace, replaceAllInCell);
+    return applyReferenceValueReplace(currentValue, findTrimmed, replace);
   }
 
   const beforeKind = getRuntimeValueKind(normalizeValue(currentValue));
@@ -353,9 +372,7 @@ export function applyCellValueReplace(params: {
     return { ok: false, error: 'No match in this cell.' };
   }
 
-  const afterDisplay = replaceAllInCell
-    ? replaceAllInDisplay(beforeDisplay, findTrimmed, replace)
-    : beforeDisplay.slice(0, span.start) + replace + beforeDisplay.slice(span.end);
+  const afterDisplay = replace;
 
   if (afterDisplay === beforeDisplay) {
     return { ok: false, error: 'No change after replace.' };

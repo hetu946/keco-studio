@@ -1862,7 +1862,8 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
         ) : cellReplacePreview ? (
           <div>
             <p>
-              Find &quot;{searchQuery.trim()}&quot; → Replace with &quot;{cellReplaceText}&quot;
+              Cells containing &quot;{searchQuery.trim()}&quot; will have their value set to &quot;
+              {cellReplaceText}&quot;.
             </p>
             <p>
               {cellReplacePreview.updated} cell(s) will be updated, {cellReplacePreview.skipped}{' '}
@@ -1888,7 +1889,8 @@ export function TopBar({ breadcrumb = [], showCreateProjectBreadcrumb: propShowC
               </ul>
             )}
             <p className={styles.cellReplaceHint}>
-              Only cell values are replaced (not property names). Types are validated before save.
+              The full cell value is replaced, not just the matched text. Types are validated
+              before save.
             </p>
           </div>
         ) : null}

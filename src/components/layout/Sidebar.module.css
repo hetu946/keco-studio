@@ -592,6 +592,10 @@
   background: #BFBFBF;
 }
 
+.projectsSection {
+  margin-top: 15px;
+}
+
 /* Projects section: max 3 rows visible; Edge-style scrollbar when more than 3 */
 .projectsListContainer {
   max-height: 9rem;
