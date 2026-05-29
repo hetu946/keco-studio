@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  findNormalizedMatchSpan,
+  replaceAllInDisplay,
+} from '@/lib/utils/cellValueReplace';
+import {
   normalizeReferenceSelections,
   normalizeReferenceValueToAssetIds,
   referenceSelectionsToValue,
@@ -11,6 +15,9 @@ export type SourceCellChange = {
   assetId: string;
   fieldId: string;
   valueJson: unknown;
+  /** When set (e.g. global find-replace), also patch displayValue substrings on references. */
+  find?: string;
+  replace?: string;
 };
 
 export type ReferenceCellUpdate = {
@@ -54,18 +61,36 @@ function applySourceChangeToReferenceValue(
   sourceAssetId: string,
   sourceFieldId: string,
   newDisplayValue: string,
-  sourceLibraryFirstFieldId: string | null
+  sourceLibraryFirstFieldId: string | null,
+  find?: string,
+  replace?: string
 ): { updated: unknown; changed: boolean } {
   const selections = normalizeReferenceSelections(valueJson);
   if (selections.length === 0) {
     return { updated: valueJson, changed: false };
   }
 
+  const findTrimmed = find?.trim() ?? '';
+  const hasFindReplace = findTrimmed.length > 0 && replace !== undefined;
+
   let changed = false;
   const next = selections.map((sel) => {
     if (!selectionMatchesSourceField(sel, sourceAssetId, sourceFieldId, sourceLibraryFirstFieldId)) {
       return sel;
     }
+
+    const currentLabel = sel.displayValue?.trim() ?? '';
+    if (hasFindReplace && currentLabel !== '') {
+      const span = findNormalizedMatchSpan(currentLabel, findTrimmed);
+      if (span) {
+        const patched = replaceAllInDisplay(currentLabel, findTrimmed, replace);
+        if (patched !== currentLabel) {
+          changed = true;
+          return { ...sel, displayValue: patched };
+        }
+      }
+    }
+
     if (sel.displayValue === newDisplayValue) return sel;
     changed = true;
     return { ...sel, displayValue: newDisplayValue };
@@ -238,7 +263,9 @@ export async function syncReferencesForSourceChanges(
           change.assetId,
           change.fieldId,
           newDisplay,
-          firstFieldId
+          firstFieldId,
+          change.find,
+          change.replace
         );
         if (result.changed) {
           nextValue = result.updated;

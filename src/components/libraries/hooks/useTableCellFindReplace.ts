@@ -252,10 +252,18 @@ export function useTableCellFindReplace({
       setReplacePreview(null);
       onClearHighlight();
 
-      if (typeof window !== 'undefined' && libraryId) {
-        window.dispatchEvent(
-          new CustomEvent('libraryCellValuesReplaced', { detail: { libraryId } })
+      if (typeof window !== 'undefined') {
+        const libraryIds = new Set<string>(
+          (result.affectedLibraryIds ?? []).filter((id) => id.length > 0)
         );
+        if (libraryId) {
+          libraryIds.add(libraryId);
+        }
+        libraryIds.forEach((id) => {
+          window.dispatchEvent(
+            new CustomEvent('libraryCellValuesReplaced', { detail: { libraryId: id } })
+          );
+        });
         (result.previews ?? []).forEach((preview) => {
           if (!preview.assetId) return;
           window.dispatchEvent(

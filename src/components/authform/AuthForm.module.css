@@ -155,16 +155,11 @@
   text-transform: uppercase;
 }
 
-.titleMain {
-  font-family: 'Nunito Sans', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 800;
-}
-
+.titleMain,
 .titleBrand {
-  font-family: var(--font-pixer), sans-serif;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 1.875rem;
-  font-weight: 400;
+  font-weight: 800;
 }
 
 .form {
