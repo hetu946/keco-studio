@@ -1,4 +1,8 @@
 import { normalizeSearchString } from '@/lib/utils/normalizeSearchString';
+import {
+  normalizeReferenceSelections,
+  referenceSelectionsToValue,
+} from '@/lib/utils/referenceValue';
 
 /** Cell value types that support find-and-replace (values only, not schema properties). */
 export const REPLACEABLE_CELL_DATA_TYPES = new Set([
@@ -10,6 +14,7 @@ export const REPLACEABLE_CELL_DATA_TYPES = new Set([
   'string_array',
   'int_array',
   'float_array',
+  'reference',
 ]);
 
 export type CellReplacePreview = {
@@ -76,6 +81,15 @@ export function valueToDisplayString(value: unknown, dataType: string): string {
       return `[${raw.map((v) => JSON.stringify(String(v))).join(',')}]`;
     }
     return String(raw);
+  }
+
+  if (dataType === 'reference') {
+    const selections = normalizeReferenceSelections(raw);
+    const labels = selections
+      .map((sel) => sel.displayValue?.trim() || '')
+      .filter((label) => label !== '');
+    if (labels.length > 0) return labels.join(' | ');
+    return selections.map((sel) => sel.assetId).join(' | ');
   }
 
   return String(raw);
@@ -228,6 +242,64 @@ export function findNormalizedMatchSpan(
   return { start, end };
 }
 
+function applyReferenceValueReplace(
+  currentValue: unknown,
+  findTrimmed: string,
+  replace: string,
+  replaceAllInCell: boolean
+): {
+  ok: true;
+  newValue: unknown;
+  beforeDisplay: string;
+  afterDisplay: string;
+} | {
+  ok: false;
+  error: string;
+} {
+  const selections = normalizeReferenceSelections(normalizeValue(currentValue));
+  if (selections.length === 0) {
+    return { ok: false, error: 'No match in this cell.' };
+  }
+
+  const beforeDisplay = valueToDisplayString(currentValue, 'reference');
+  let anyMatch = false;
+  let anyChange = false;
+
+  const nextSelections = selections.map((sel) => {
+    const label = sel.displayValue?.trim() ?? '';
+    const span = findNormalizedMatchSpan(label, findTrimmed);
+    if (!span) return sel;
+
+    anyMatch = true;
+    const afterLabel = replaceAllInCell
+      ? replaceAllInDisplay(label, findTrimmed, replace)
+      : label.slice(0, span.start) + replace + label.slice(span.end);
+
+    if (afterLabel === label) return sel;
+    anyChange = true;
+    return { ...sel, displayValue: afterLabel };
+  });
+
+  if (!anyMatch) {
+    return { ok: false, error: 'No match in this cell.' };
+  }
+  if (!anyChange) {
+    return { ok: false, error: 'No change after replace.' };
+  }
+
+  const afterDisplay = valueToDisplayString(
+    referenceSelectionsToValue(nextSelections),
+    'reference'
+  );
+
+  return {
+    ok: true,
+    newValue: referenceSelectionsToValue(nextSelections),
+    beforeDisplay,
+    afterDisplay,
+  };
+}
+
 export function replaceAllInDisplay(
   display: string,
   find: string,
@@ -268,6 +340,10 @@ export function applyCellValueReplace(params: {
   const findTrimmed = find.trim();
   if (!findTrimmed) {
     return { ok: false, error: 'Find text is required.' };
+  }
+
+  if (dataType === 'reference') {
+    return applyReferenceValueReplace(currentValue, findTrimmed, replace, replaceAllInCell);
   }
 
   const beforeKind = getRuntimeValueKind(normalizeValue(currentValue));

@@ -319,6 +319,8 @@ export async function POST(req: Request) {
           assetId: row.asset_id,
           fieldId: row.field_id,
           valueJson: row.value_json,
+          find,
+          replace,
         }));
         const refUpdates = await syncReferencesForSourceChanges(supabase, sourceChanges);
         for (const u of refUpdates) {
