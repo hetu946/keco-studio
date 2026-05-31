@@ -36,6 +36,7 @@ import { useClickOutsideAutoSave } from './hooks/useClickOutsideAutoSave';
 import { useTableMenuPosition } from './hooks/useTableMenuPosition';
 import { useClipboardShortcuts } from './hooks/useClipboardShortcuts';
 import { useResolvedRows } from './hooks/useResolvedRows';
+import { useColumnValueFilters } from './hooks/useColumnValueFilters';
 import { useCloseOnDocumentClick } from './hooks/useCloseOnDocumentClick';
 import { useOptimisticUpdates } from './hooks/useOptimisticUpdates';
 import { useMediaFileUpdate } from './hooks/useMediaFileUpdate';
@@ -357,12 +358,6 @@ export function LibraryAssetsTable({
     setIsViewerBannerDismissed(false);
   }, [library?.id]);
 
-  useEffect(() => {
-    if (detailDrawerRowId && !resolvedRows.some((r) => r.id === detailDrawerRowId)) {
-      setDetailDrawerRowId(null);
-    }
-  }, [detailDrawerRowId, resolvedRows]);
-
   const {
     isAddingRow,
     setIsAddingRow,
@@ -517,6 +512,20 @@ export function LibraryAssetsTable({
 
     return { groups, orderedProperties };
   }, [sections, properties]);
+
+  const {
+    filteredRows: displayRows,
+    applyColumnFilter,
+    isColumnFiltered,
+    getAppliedFilterValues,
+    getRowsForColumnFilter,
+  } = useColumnValueFilters(resolvedRows, orderedProperties);
+
+  useEffect(() => {
+    if (detailDrawerRowId && !displayRows.some((r) => r.id === detailDrawerRowId)) {
+      setDetailDrawerRowId(null);
+    }
+  }, [detailDrawerRowId, displayRows]);
 
   // Section tab: which section's columns to show (default first section)
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -1150,13 +1159,13 @@ export function LibraryAssetsTable({
 
   // Header-level "select all rows" state
   const headerAllRowsSelected =
-    resolvedRows.length > 0 && resolvedRows.every((row) => selectedRowIds.has(row.id));
+    resolvedRows.length > 0 && displayRows.every((row) => selectedRowIds.has(row.id));
   const headerHasSomeRowsSelected =
     selectedRowIds.size > 0 && !headerAllRowsSelected;
 
   const handleToggleSelectAllRows = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(resolvedRows.map((row) => row.id));
+      const allIds = new Set(displayRows.map((row) => row.id));
       setSelectedRowIds(allIds);
     } else {
       setSelectedRowIds(new Set());
@@ -1301,9 +1310,14 @@ export function LibraryAssetsTable({
               addColumnButtonRef={addColumnButtonRef}
               onColumnResizeStart={startColumnResize}
               isResizingColumn={isResizingColumn}
+              rows={resolvedRows}
+              onApplyColumnFilter={applyColumnFilter}
+              isColumnFiltered={isColumnFiltered}
+              getAppliedFilterValues={getAppliedFilterValues}
+              getRowsForColumnFilter={getRowsForColumnFilter}
             />
             <tbody className={styles.body}>
-              {resolvedRows.map((row, index) => {
+              {displayRows.map((row, index) => {
                 const isRowHovered = hoveredRowId === row.id;
                 const isRowSelected = selectedRowIds.has(row.id);
                 const allRowsForSelection = getAllRowsForCellSelection();
@@ -2018,7 +2032,7 @@ export function LibraryAssetsTable({
       />
 
       {detailDrawerRowId && (() => {
-        const drawerRow = resolvedRows.find((r) => r.id === detailDrawerRowId);
+        const drawerRow = displayRows.find((r) => r.id === detailDrawerRowId);
         if (!drawerRow) return null;
         return (
           <AssetDetailDrawer
