@@ -7,12 +7,13 @@ import { Checkbox, Tooltip } from 'antd';
 import { useParams } from 'next/navigation';
 import { useSupabase } from '@/lib/SupabaseContext';
 import { useQueryClient } from '@tanstack/react-query';
-import type { SectionConfig, PropertyConfig } from '@/lib/types/libraryAssets';
+import type { AssetRow, SectionConfig, PropertyConfig } from '@/lib/types/libraryAssets';
 import { deleteLibraryField, updateLibraryField } from '@/lib/services/libraryAssetsService';
 import { queryKeys } from '@/lib/utils/queryKeys';
 import { showErrorToast, showSuccessToast } from '@/lib/utils/toast';
 import { getFieldTypeIcon, FIELD_TYPE_OPTIONS } from '@/app/(dashboard)/[projectId]/[libraryId]/predefine/utils';
 import { EditColumnModal } from './EditColumnModal';
+import { ColumnValueFilterPopover } from './ColumnValueFilterPopover';
 import { NUMBER_COLUMN_KEY } from '../hooks/useTableResize';
 import styles from '@/components/libraries/LibraryAssetsTable.module.css';
 import showIcon from '@/assets/images/showIcon.svg';
@@ -127,6 +128,20 @@ export type TableHeaderProps = {
   onColumnResizeStart?: (columnKey: string, clientX: number, element: HTMLElement) => void;
   /** Whether a column is currently being resized */
   isResizingColumn?: boolean;
+  /** Table rows used to collect unique column values for filtering */
+  rows?: AssetRow[];
+  /** Apply a value filter for a column (all selected removes the filter) */
+  onApplyColumnFilter?: (
+    propertyId: string,
+    selectedValues: Set<string>,
+    allValues: Set<string>
+  ) => void;
+  /** Whether a column currently has an active value filter */
+  isColumnFiltered?: (propertyId: string) => boolean;
+  /** Applied filter values for a column, if any */
+  getAppliedFilterValues?: (propertyId: string) => Set<string> | undefined;
+  /** Rows visible under all other column filters (used to build the value list) */
+  getRowsForColumnFilter?: (propertyId: string) => AssetRow[];
 };
 
 export function TableHeader({
@@ -141,6 +156,11 @@ export function TableHeader({
   addColumnButtonRef,
   onColumnResizeStart,
   isResizingColumn = false,
+  rows = [],
+  onApplyColumnFilter,
+  isColumnFiltered,
+  getAppliedFilterValues,
+  getRowsForColumnFilter,
 }: TableHeaderProps) {
   const supabase = useSupabase();
   const params = useParams();
@@ -203,6 +223,14 @@ export function TableHeader({
     open: false,
   });
 
+  const [filterTarget, setFilterTarget] = useState<{
+    open: boolean;
+    property?: PropertyConfig;
+    anchorRect?: DOMRect;
+  }>({
+    open: false,
+  });
+
   // 点击任意非浮层区域时关闭浮层（使用捕获阶段，避免被内部 stopPropagation 影响）
   useEffect(() => {
     if (!headerMenu.visible) return;
@@ -234,6 +262,15 @@ export function TableHeader({
       window.removeEventListener('scroll', handleScroll, true);
     };
   }, [headerMenu.visible]);
+
+  const openColumnFilter = (anchorEl: HTMLDivElement, property: PropertyConfig) => {
+    const rect = anchorEl.getBoundingClientRect();
+    setFilterTarget({
+      open: true,
+      property,
+      anchorRect: rect,
+    });
+  };
 
   const openHeaderMenu = (
     anchorEl: HTMLDivElement,
@@ -318,6 +355,7 @@ export function TableHeader({
             >
               <div
                 className={styles.propertyHeaderContent}
+                data-property-header-id={property.id}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   openHeaderMenu(
@@ -355,6 +393,31 @@ export function TableHeader({
                         height={16}
                         className={styles.propertyHeaderIcon}
                       />
+                    </Tooltip>
+                  )}
+                  {isColumnFiltered?.(property.id) && (
+                    <Tooltip title="Column filter active" placement="top">
+                      <button
+                        type="button"
+                        className={styles.columnFilterActiveButton}
+                        aria-label="Column filter active"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const contentEl = (e.currentTarget as HTMLElement).closest(
+                            `.${styles.propertyHeaderContent}`
+                          ) as HTMLDivElement | null;
+                          if (contentEl) {
+                            openColumnFilter(contentEl, property);
+                          }
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                          <path
+                            d="M1.5 2h9l-3.25 4.1V9.5L6.25 10.5v-4.4L3 2z"
+                            fill="#0B99FF"
+                          />
+                        </svg>
+                      </button>
                     </Tooltip>
                   )}
                   <div
@@ -426,6 +489,27 @@ export function TableHeader({
             }}
           >
             <div className={styles.headerContextMenuLabel}>OPTION</div>
+            <button
+              type="button"
+              className={styles.headerContextMenuButton}
+              onClick={() => {
+                if (!headerMenu.propertyId) return;
+                const property = groups
+                  .flatMap((group) => group.properties)
+                  .find((prop) => prop.id === headerMenu.propertyId);
+                if (!property) return;
+
+                const anchorEl = document.querySelector(
+                  `[data-property-header-id="${headerMenu.propertyId}"]`
+                ) as HTMLDivElement | null;
+                if (anchorEl) {
+                  openColumnFilter(anchorEl, property);
+                }
+                setHeaderMenu((prev) => ({ ...prev, visible: false }));
+              }}
+            >
+              Filter
+            </button>
             <button
               type="button"
               className={styles.headerContextMenuButton}
@@ -567,6 +651,25 @@ export function TableHeader({
       {header}
       {menu}
       {deleteColumnConfirmOverlay}
+      {filterTarget.open && filterTarget.property && (
+        <ColumnValueFilterPopover
+          open
+          anchorRect={filterTarget.anchorRect ?? null}
+          property={filterTarget.property}
+          rows={getRowsForColumnFilter?.(filterTarget.property.id) ?? rows}
+          allProperties={existingProperties ?? groups.flatMap((group) => group.properties)}
+          appliedValues={getAppliedFilterValues?.(filterTarget.property.id)}
+          onClose={() => setFilterTarget({ open: false })}
+          onApply={(selectedValues, allValues) => {
+            if (!onApplyColumnFilter) {
+              setFilterTarget({ open: false });
+              return;
+            }
+            onApplyColumnFilter(filterTarget.property!.id, selectedValues, allValues);
+            setFilterTarget({ open: false });
+          }}
+        />
+      )}
       <EditColumnModal
         open={editTarget.open}
         anchorPosition={
