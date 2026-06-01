@@ -138,10 +138,8 @@ export type TableHeaderProps = {
   ) => void;
   /** Whether a column currently has an active value filter */
   isColumnFiltered?: (propertyId: string) => boolean;
-  /** Applied filter values for a column, if any */
-  getAppliedFilterValues?: (propertyId: string) => Set<string> | undefined;
-  /** Rows visible under all other column filters (used to build the value list) */
-  getRowsForColumnFilter?: (propertyId: string) => AssetRow[];
+  /** Checked values derived from row visibility (synced across columns) */
+  getCheckedFilterValues?: (propertyId: string) => Set<string>;
 };
 
 export function TableHeader({
@@ -159,8 +157,7 @@ export function TableHeader({
   rows = [],
   onApplyColumnFilter,
   isColumnFiltered,
-  getAppliedFilterValues,
-  getRowsForColumnFilter,
+  getCheckedFilterValues,
 }: TableHeaderProps) {
   const supabase = useSupabase();
   const params = useParams();
@@ -656,9 +653,9 @@ export function TableHeader({
           open
           anchorRect={filterTarget.anchorRect ?? null}
           property={filterTarget.property}
-          rows={getRowsForColumnFilter?.(filterTarget.property.id) ?? rows}
+          rows={rows}
           allProperties={existingProperties ?? groups.flatMap((group) => group.properties)}
-          appliedValues={getAppliedFilterValues?.(filterTarget.property.id)}
+          checkedValues={getCheckedFilterValues?.(filterTarget.property.id)}
           onClose={() => setFilterTarget({ open: false })}
           onApply={(selectedValues, allValues) => {
             if (!onApplyColumnFilter) {
