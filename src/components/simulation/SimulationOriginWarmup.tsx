@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   getSimulationOrigin,
   isSimulationEmbedConfigured,
+  isSimulationOriginSameAsCurrent,
   isSimulationWarmupEnabled,
 } from '@/lib/simulationClientConfig';
 
@@ -14,10 +16,24 @@ const PRECONNECT_ID = 'keco-simulation-preconnect';
  * hub so the first real navigation feels faster (especially Next dev compile on :3001).
  */
 export function SimulationOriginWarmup() {
+  const pathname = usePathname();
   const [warmSrc, setWarmSrc] = useState<string | null>(null);
 
+  // Skip warmup while the real embed is already on screen: the visible iframe in
+  // `SimulationSystemEmbed` loads the same app, so a second hidden instance would
+  // just double the work (extra Supabase client + React Query + dev compile).
+  const onSimulationRoute = pathname?.startsWith('/simulation-system') ?? false;
+
   useEffect(() => {
+    if (onSimulationRoute) {
+      setWarmSrc(null);
+      return;
+    }
     if (!isSimulationWarmupEnabled() || !isSimulationEmbedConfigured()) {
+      return;
+    }
+    // Never warm Studio's own origin: that would recursively load this app.
+    if (isSimulationOriginSameAsCurrent()) {
       return;
     }
     const origin = getSimulationOrigin();
@@ -61,7 +77,7 @@ export function SimulationOriginWarmup() {
       const link = typeof document !== 'undefined' ? document.getElementById(PRECONNECT_ID) : null;
       link?.parentNode?.removeChild(link);
     };
-  }, []);
+  }, [onSimulationRoute]);
 
   if (!warmSrc) {
     return null;
