@@ -5,6 +5,15 @@ import {
   getCustomFormulaExpressionFromCellValue,
 } from '@/components/libraries/utils/formulaEvaluation';
 
+/** Row visibility is controlled only by hidden row ids. */
+export type RowVisibilityFilterState = {
+  hiddenRowIds: Set<string>;
+};
+
+export function buildPropertyById(properties: PropertyConfig[]): Map<string, PropertyConfig> {
+  return new Map(properties.map((property) => [property.id, property]));
+}
+
 /** Display string used as the filter key for a cell value. */
 export function getFilterDisplayValue(
   row: AssetRow,
@@ -27,55 +36,86 @@ export function getFilterDisplayValue(
   return valueToDisplayString(row.propertyValues[property.key], property.dataType ?? '');
 }
 
-export function filterRowsByColumnFilters(
-  rows: AssetRow[],
-  columnFilters: Map<string, Set<string>>,
-  properties: PropertyConfig[],
-  excludePropertyId?: string
-): AssetRow[] {
-  if (columnFilters.size === 0) return rows;
-
-  return rows.filter((row) => {
-    for (const [propertyId, allowedValues] of columnFilters) {
-      if (propertyId === excludePropertyId) continue;
-      const property = properties.find((p) => p.id === propertyId);
-      if (!property) continue;
-      const display = getFilterDisplayValue(row, property, properties);
-      if (!allowedValues.has(display)) return false;
-    }
-    return true;
-  });
+export function isRowVisible(row: AssetRow, hiddenRowIds: Set<string>): boolean {
+  return !hiddenRowIds.has(row.id);
 }
 
-export function pruneColumnFilters(
+export function filterRowsByVisibility(
   rows: AssetRow[],
-  properties: PropertyConfig[],
-  columnFilters: Map<string, Set<string>>
-): Map<string, Set<string>> {
-  const next = new Map<string, Set<string>>();
+  hiddenRowIds: Set<string>
+): AssetRow[] {
+  if (hiddenRowIds.size === 0) return rows;
+  return rows.filter((row) => isRowVisible(row, hiddenRowIds));
+}
 
-  for (const [propertyId, allowedValues] of columnFilters) {
-    const property = properties.find((p) => p.id === propertyId);
-    if (!property) continue;
+/**
+ * Checked values for a column filter UI: value is checked when every row
+ * with that value in this column is visible (not in hiddenRowIds).
+ */
+export function getCheckedFilterValuesForColumn(
+  rows: AssetRow[],
+  property: PropertyConfig,
+  hiddenRowIds: Set<string>,
+  properties: PropertyConfig[]
+): Set<string> {
+  const checked = new Set<string>();
+  const rowsByValue = new Map<string, AssetRow[]>();
 
-    const contextRows = filterRowsByColumnFilters(rows, columnFilters, properties, propertyId);
-    const validValues = new Set(collectColumnUniqueValues(contextRows, property, properties));
-    const pruned = new Set<string>();
-    for (const value of allowedValues) {
-      if (validValues.has(value)) pruned.add(value);
-    }
-
-    const allSelected =
-      validValues.size > 0 &&
-      pruned.size === validValues.size &&
-      Array.from(validValues).every((value) => pruned.has(value));
-
-    if (!allSelected) {
-      next.set(propertyId, pruned);
+  for (const row of rows) {
+    const value = getFilterDisplayValue(row, property, properties);
+    const bucket = rowsByValue.get(value);
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      rowsByValue.set(value, [row]);
     }
   }
 
+  for (const [value, rowsWithValue] of rowsByValue) {
+    if (rowsWithValue.every((row) => isRowVisible(row, hiddenRowIds))) {
+      checked.add(value);
+    }
+  }
+
+  return checked;
+}
+
+/** Map selected values in a column to hiddenRowIds updates (row-id based). */
+export function applyColumnFilterByRowIds(
+  rows: AssetRow[],
+  property: PropertyConfig,
+  selectedValues: Set<string>,
+  hiddenRowIds: Set<string>,
+  properties: PropertyConfig[]
+): Set<string> {
+  const next = new Set(hiddenRowIds);
+  const rowIdSet = new Set(rows.map((row) => row.id));
+
+  for (const row of rows) {
+    const value = getFilterDisplayValue(row, property, properties);
+    if (selectedValues.has(value)) {
+      next.delete(row.id);
+    } else {
+      next.add(row.id);
+    }
+  }
+
+  for (const rowId of next) {
+    if (!rowIdSet.has(rowId)) next.delete(rowId);
+  }
+
   return next;
+}
+
+export function isColumnFilterActive(
+  rows: AssetRow[],
+  property: PropertyConfig,
+  hiddenRowIds: Set<string>,
+  properties: PropertyConfig[]
+): boolean {
+  const allValues = collectColumnUniqueValues(rows, property, properties);
+  const checked = getCheckedFilterValuesForColumn(rows, property, hiddenRowIds, properties);
+  return checked.size < allValues.length;
 }
 
 export function collectColumnUniqueValues(
@@ -105,4 +145,8 @@ export function getFilterValueInitial(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return '?';
   return trimmed.charAt(0).toUpperCase();
+}
+
+export function createEmptyRowVisibilityFilterState(): RowVisibilityFilterState {
+  return { hiddenRowIds: new Set() };
 }

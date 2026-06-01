@@ -1,58 +1,59 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AssetRow, PropertyConfig } from '@/lib/types/libraryAssets';
 import {
-  filterRowsByColumnFilters,
-  getFilterDisplayValue,
-  pruneColumnFilters,
+  applyColumnFilterByRowIds,
+  buildPropertyById,
+  createEmptyRowVisibilityFilterState,
+  filterRowsByVisibility,
+  getCheckedFilterValuesForColumn,
+  isColumnFilterActive,
 } from '@/lib/utils/columnValueFilter';
 
 export function useColumnValueFilters(rows: AssetRow[], properties: PropertyConfig[]) {
-  const [columnFilters, setColumnFilters] = useState<Map<string, Set<string>>>(new Map());
+  const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(
+    () => createEmptyRowVisibilityFilterState().hiddenRowIds
+  );
+
+  const propertyById = useMemo(() => buildPropertyById(properties), [properties]);
 
   const filteredRows = useMemo(() => {
-    return filterRowsByColumnFilters(rows, columnFilters, properties);
-  }, [rows, columnFilters, properties]);
+    return filterRowsByVisibility(rows, hiddenRowIds);
+  }, [rows, hiddenRowIds]);
 
   const applyColumnFilter = useCallback(
-    (propertyId: string, selectedValues: Set<string>, allValues: Set<string>) => {
-      setColumnFilters((prev) => {
-        const next = new Map(prev);
-        const allSelected =
-          allValues.size === selectedValues.size &&
-          Array.from(allValues).every((value) => selectedValues.has(value));
+    (propertyId: string, selectedValues: Set<string>, _allValues: Set<string>) => {
+      const property = propertyById.get(propertyId);
+      if (!property) return;
 
-        if (allSelected) {
-          next.delete(propertyId);
-        } else {
-          next.set(propertyId, new Set(selectedValues));
-        }
-
-        return pruneColumnFilters(rows, properties, next);
-      });
+      setHiddenRowIds((prev) =>
+        applyColumnFilterByRowIds(rows, property, selectedValues, prev, properties)
+      );
     },
-    [rows, properties]
+    [rows, properties, propertyById]
   );
 
   const isColumnFiltered = useCallback(
-    (propertyId: string) => columnFilters.has(propertyId),
-    [columnFilters]
+    (propertyId: string) => {
+      const property = propertyById.get(propertyId);
+      if (!property) return false;
+      return isColumnFilterActive(rows, property, hiddenRowIds, properties);
+    },
+    [rows, hiddenRowIds, properties, propertyById]
   );
 
-  const getAppliedFilterValues = useCallback(
-    (propertyId: string) => columnFilters.get(propertyId),
-    [columnFilters]
-  );
-
-  const getRowsForColumnFilter = useCallback(
-    (propertyId: string) => filterRowsByColumnFilters(rows, columnFilters, properties, propertyId),
-    [rows, columnFilters, properties]
+  const getCheckedFilterValues = useCallback(
+    (propertyId: string) => {
+      const property = propertyById.get(propertyId);
+      if (!property) return new Set<string>();
+      return getCheckedFilterValuesForColumn(rows, property, hiddenRowIds, properties);
+    },
+    [rows, hiddenRowIds, properties, propertyById]
   );
 
   return {
     filteredRows,
     applyColumnFilter,
     isColumnFiltered,
-    getAppliedFilterValues,
-    getRowsForColumnFilter,
+    getCheckedFilterValues,
   };
 }

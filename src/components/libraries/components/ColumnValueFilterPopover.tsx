@@ -19,7 +19,7 @@ type ColumnValueFilterPopoverProps = {
   property: PropertyConfig | undefined;
   rows: AssetRow[];
   allProperties: PropertyConfig[];
-  appliedValues?: Set<string>;
+  checkedValues?: Set<string>;
   onClose: () => void;
   onApply: (selectedValues: Set<string>, allValues: Set<string>) => void;
 };
@@ -51,7 +51,7 @@ export function ColumnValueFilterPopover({
   property,
   rows,
   allProperties,
-  appliedValues,
+  checkedValues,
   onClose,
   onApply,
 }: ColumnValueFilterPopoverProps) {
@@ -69,38 +69,34 @@ export function ColumnValueFilterPopover({
   useEffect(() => {
     if (!open) return;
     setSearchText('');
-
-    if (appliedValues && appliedValues.size > 0) {
-      const availableSelected = allValues.filter((value) => appliedValues.has(value));
-      setDraftSelected(
-        new Set(availableSelected.length > 0 ? availableSelected : allValues)
-      );
-      return;
-    }
-
-    setDraftSelected(new Set(allValues));
-  }, [open, appliedValues, allValues]);
+    setDraftSelected(new Set(checkedValues ?? allValues));
+  }, [open, checkedValues, allValues]);
 
   useEffect(() => {
     if (!open) return;
 
+    const isInsidePopover = (target: EventTarget | null) => {
+      if (!popoverRef.current || !target || !(target instanceof Node)) return false;
+      return popoverRef.current.contains(target);
+    };
+
     const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (popoverRef.current && target && popoverRef.current.contains(target)) {
-        return;
-      }
+      if (isInsidePopover(event.target)) return;
       onClose();
     };
 
-    const handleScroll = () => onClose();
+    const handleScrollOrWheel = (event: Event) => {
+      if (isInsidePopover(event.target)) return;
+      onClose();
+    };
 
     window.addEventListener('mousedown', handlePointerDown, true);
-    window.addEventListener('wheel', handleScroll);
-    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('wheel', handleScrollOrWheel, { passive: true });
+    window.addEventListener('scroll', handleScrollOrWheel, true);
     return () => {
       window.removeEventListener('mousedown', handlePointerDown, true);
-      window.removeEventListener('wheel', handleScroll);
-      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('wheel', handleScrollOrWheel);
+      window.removeEventListener('scroll', handleScrollOrWheel, true);
     };
   }, [open, onClose]);
 
