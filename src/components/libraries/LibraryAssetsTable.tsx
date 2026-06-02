@@ -1267,19 +1267,21 @@ export function LibraryAssetsTable({
               </button>
             </div>
           ) : (
-            <div />
+            <div className={styles.tableTopBarSpacer} />
           )}
-          <TableCellFindReplace
-            libraryId={library?.id}
-            rows={resolvedRows}
-            properties={orderedProperties}
-            canReplace={userRole === 'admin' || userRole === 'editor'}
-            getAccessToken={getTableFindAccessToken}
-            onHighlightCells={handleTableFindHighlightCells}
-            onClearHighlight={handleTableFindClearHighlight}
-            onFocusSection={hasSections ? handleTableFindFocusSection : undefined}
-            scrollToCell={handleTableFindScrollToCell}
-          />
+          <div className={styles.tableTopBarFindWrap}>
+            <TableCellFindReplace
+              libraryId={library?.id}
+              rows={resolvedRows}
+              properties={orderedProperties}
+              canReplace={userRole === 'admin' || userRole === 'editor'}
+              getAccessToken={getTableFindAccessToken}
+              onHighlightCells={handleTableFindHighlightCells}
+              onClearHighlight={handleTableFindClearHighlight}
+              onFocusSection={hasSections ? handleTableFindFocusSection : undefined}
+              scrollToCell={handleTableFindScrollToCell}
+            />
+          </div>
         </div>
         <div
           className={`${styles.tableContainer} ${isResizingColumn || isResizingRow ? styles.tableResizing : ''}`}
