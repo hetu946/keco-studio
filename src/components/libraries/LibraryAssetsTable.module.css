@@ -84,6 +84,8 @@
   border-bottom: 1px solid #e2e8f0;
   background: #ffffff;
   min-height: 2.75rem;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
 }
 
 .tableTopBar .sectionTabs {
@@ -91,12 +93,33 @@
   min-width: 0;
   margin-bottom: 0;
   border-bottom: none;
+  border-top-left-radius: 0.5rem;
+  align-self: stretch;
+}
+
+.tableTopBarSpacer {
+  flex: 1;
+  min-width: 0;
+  background: #ffffff;
+  border-top-left-radius: 0.5rem;
+}
+
+.tableTopBarFindWrap {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: #ffffff;
+  border-top-right-radius: 0.5rem;
 }
 
 .tableContainer {
   overflow-x: auto;
   overflow-y: hidden;
   background: #ffffff;
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
 }
 
 .addColumnButton {
@@ -135,6 +158,11 @@
   background: #F9FAFB;
   border-left: none;
   border-right: 1px solid #DDE1E6;
+}
+
+.headerRowTop .addColumnHeaderCellSectionRow {
+  background: #0000001A;
+  border-bottom: 2px solid #e2e8f0;
 }
 
 .addColumnCell {
@@ -448,6 +476,15 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  flex: 1;
+}
+
+.propertyHeaderNameGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .properIconContent {
@@ -491,17 +528,47 @@
   opacity: 1;
 }
 
-.columnFilterActiveButton {
-  width: 16px;
-  height: 16px;
+.columnFilterButton {
+  width: 12px;
+  height: 12px;
   padding: 0;
+  margin: 0 0 0 2px;
   border: none;
-  background: transparent;
+  outline: none;
+  background: none;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
+  color: #64748b;
+  transition: color 0.15s ease;
+}
+
+.columnFilterButton:hover,
+.columnFilterButton:focus,
+.columnFilterButton:focus-visible,
+.columnFilterButton:active {
+  border: none;
+  outline: none;
+  background: none;
+  box-shadow: none;
+}
+
+.columnFilterButton:hover {
+  color: #0B99FF;
+}
+
+.columnFilterButtonActive {
+  color: #0B99FF;
+}
+
+.columnFilterIcon {
+  flex-shrink: 0;
+  display: block;
 }
 
 

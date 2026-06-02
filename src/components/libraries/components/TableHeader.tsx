@@ -322,6 +322,13 @@ export function TableHeader({
               {group.section.name}
             </th>
           ))}
+          {showAddColumn && (
+            <th
+              scope="col"
+              className={`${styles.headerCell} ${styles.addColumnHeaderCell} ${styles.addColumnHeaderCellSectionRow}`}
+              aria-hidden
+            />
+          )}
         </tr>
       )}
       <tr className={styles.headerRowBottom}>
@@ -375,10 +382,74 @@ export function TableHeader({
                       className={styles.propertyHeaderTypeIcon}
                     />
                   </Tooltip>
-                  <EllipsisTextWithTooltip
-                    text={property.name}
-                    className={styles.propertyHeaderText}
-                  />
+                  <div className={styles.propertyHeaderNameGroup}>
+                    <EllipsisTextWithTooltip
+                      text={property.name}
+                      className={styles.propertyHeaderText}
+                    />
+                    {onApplyColumnFilter && (
+                      <Tooltip
+                        title={isColumnFiltered?.(property.id) ? 'Column filter active' : 'Filter by values'}
+                        placement="top"
+                      >
+                        <button
+                          type="button"
+                          className={`${styles.columnFilterButton} ${
+                            isColumnFiltered?.(property.id) ? styles.columnFilterButtonActive : ''
+                          }`}
+                          aria-label={
+                            isColumnFiltered?.(property.id) ? 'Column filter active' : 'Filter by values'
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const contentEl = (e.currentTarget as HTMLElement).closest(
+                              `.${styles.propertyHeaderContent}`
+                            ) as HTMLDivElement | null;
+                            if (contentEl) {
+                              openColumnFilter(contentEl, property);
+                            }
+                          }}
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 12 12"
+                            fill="none"
+                            aria-hidden="true"
+                            className={styles.columnFilterIcon}
+                          >
+                            <line
+                              x1="1"
+                              y1="2.5"
+                              x2="11"
+                              y2="2.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                            <line
+                              x1="2.5"
+                              y1="6"
+                              x2="9.5"
+                              y2="6"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                            <line
+                              x1="4"
+                              y1="9.5"
+                              x2="8"
+                              y2="9.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
                 <div className={styles.properIconContent}>
                   {property.description && (
@@ -390,31 +461,6 @@ export function TableHeader({
                         height={16}
                         className={styles.propertyHeaderIcon}
                       />
-                    </Tooltip>
-                  )}
-                  {isColumnFiltered?.(property.id) && (
-                    <Tooltip title="Column filter active" placement="top">
-                      <button
-                        type="button"
-                        className={styles.columnFilterActiveButton}
-                        aria-label="Column filter active"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const contentEl = (e.currentTarget as HTMLElement).closest(
-                            `.${styles.propertyHeaderContent}`
-                          ) as HTMLDivElement | null;
-                          if (contentEl) {
-                            openColumnFilter(contentEl, property);
-                          }
-                        }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                          <path
-                            d="M1.5 2h9l-3.25 4.1V9.5L6.25 10.5v-4.4L3 2z"
-                            fill="#0B99FF"
-                          />
-                        </svg>
-                      </button>
                     </Tooltip>
                   )}
                   <div
@@ -486,27 +532,6 @@ export function TableHeader({
             }}
           >
             <div className={styles.headerContextMenuLabel}>OPTION</div>
-            <button
-              type="button"
-              className={styles.headerContextMenuButton}
-              onClick={() => {
-                if (!headerMenu.propertyId) return;
-                const property = groups
-                  .flatMap((group) => group.properties)
-                  .find((prop) => prop.id === headerMenu.propertyId);
-                if (!property) return;
-
-                const anchorEl = document.querySelector(
-                  `[data-property-header-id="${headerMenu.propertyId}"]`
-                ) as HTMLDivElement | null;
-                if (anchorEl) {
-                  openColumnFilter(anchorEl, property);
-                }
-                setHeaderMenu((prev) => ({ ...prev, visible: false }));
-              }}
-            >
-              Filter
-            </button>
             <button
               type="button"
               className={styles.headerContextMenuButton}
