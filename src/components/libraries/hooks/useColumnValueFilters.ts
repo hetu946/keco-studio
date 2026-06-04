@@ -7,9 +7,15 @@ import {
   filterRowsByVisibility,
   getCheckedFilterValuesForColumn,
   isColumnFilterActive,
+  type ColumnFilterOptions,
 } from '@/lib/utils/columnValueFilter';
 
-export function useColumnValueFilters(rows: AssetRow[], properties: PropertyConfig[]) {
+export function useColumnValueFilters(
+  rows: AssetRow[],
+  properties: PropertyConfig[],
+  assetNamesCache: Record<string, string> = {}
+) {
+  const filterOptions: ColumnFilterOptions = { assetNamesCache };
   const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(
     () => createEmptyRowVisibilityFilterState().hiddenRowIds
   );
@@ -26,28 +32,34 @@ export function useColumnValueFilters(rows: AssetRow[], properties: PropertyConf
       if (!property) return;
 
       setHiddenRowIds((prev) =>
-        applyColumnFilterByRowIds(rows, property, selectedValues, prev, properties)
+        applyColumnFilterByRowIds(rows, property, selectedValues, prev, properties, filterOptions)
       );
     },
-    [rows, properties, propertyById]
+    [rows, properties, propertyById, assetNamesCache]
   );
 
   const isColumnFiltered = useCallback(
     (propertyId: string) => {
       const property = propertyById.get(propertyId);
       if (!property) return false;
-      return isColumnFilterActive(rows, property, hiddenRowIds, properties);
+      return isColumnFilterActive(rows, property, hiddenRowIds, properties, filterOptions);
     },
-    [rows, hiddenRowIds, properties, propertyById]
+    [rows, hiddenRowIds, properties, propertyById, assetNamesCache]
   );
 
   const getCheckedFilterValues = useCallback(
     (propertyId: string) => {
       const property = propertyById.get(propertyId);
       if (!property) return new Set<string>();
-      return getCheckedFilterValuesForColumn(rows, property, hiddenRowIds, properties);
+      return getCheckedFilterValuesForColumn(
+        rows,
+        property,
+        hiddenRowIds,
+        properties,
+        filterOptions
+      );
     },
-    [rows, hiddenRowIds, properties, propertyById]
+    [rows, hiddenRowIds, properties, propertyById, assetNamesCache]
   );
 
   return {

@@ -1,6 +1,10 @@
 import type { AssetRow, PropertyConfig } from '@/lib/types/libraryAssets';
 import { valueToDisplayString } from '@/lib/utils/cellValueReplace';
 import {
+  normalizeReferenceSelections,
+  resolveReferenceSelectionLabel,
+} from '@/lib/utils/referenceValue';
+import {
   evaluateFormulaForRow,
   getCustomFormulaExpressionFromCellValue,
 } from '@/components/libraries/utils/formulaEvaluation';
@@ -10,15 +14,34 @@ export type RowVisibilityFilterState = {
   hiddenRowIds: Set<string>;
 };
 
+/** Optional context for column filters (e.g. reference label cache). */
+export type ColumnFilterOptions = {
+  assetNamesCache?: Record<string, string>;
+};
+
 export function buildPropertyById(properties: PropertyConfig[]): Map<string, PropertyConfig> {
   return new Map(properties.map((property) => [property.id, property]));
+}
+
+function referenceValueToFilterString(
+  raw: unknown,
+  assetNamesCache: Record<string, string>
+): string {
+  const selections = normalizeReferenceSelections(raw);
+  if (selections.length === 0) return '';
+
+  const labels = selections
+    .map((sel) => resolveReferenceSelectionLabel(sel, assetNamesCache).trim())
+    .filter((label) => label !== '');
+  return labels.join(' | ');
 }
 
 /** Display string used as the filter key for a cell value. */
 export function getFilterDisplayValue(
   row: AssetRow,
   property: PropertyConfig | undefined,
-  allProperties: PropertyConfig[] = []
+  allProperties: PropertyConfig[] = [],
+  options: ColumnFilterOptions = {}
 ): string {
   if (!property) return '';
 
@@ -31,6 +54,13 @@ export function getFilterDisplayValue(
     if (typeof result === 'boolean') return result ? 'true' : 'false';
     if (result === null || result === undefined) return '';
     return String(result);
+  }
+
+  if (property.dataType === 'reference') {
+    return referenceValueToFilterString(
+      row.propertyValues[property.key],
+      options.assetNamesCache ?? {}
+    );
   }
 
   return valueToDisplayString(row.propertyValues[property.key], property.dataType ?? '');
@@ -56,13 +86,14 @@ export function getCheckedFilterValuesForColumn(
   rows: AssetRow[],
   property: PropertyConfig,
   hiddenRowIds: Set<string>,
-  properties: PropertyConfig[]
+  properties: PropertyConfig[],
+  options: ColumnFilterOptions = {}
 ): Set<string> {
   const checked = new Set<string>();
   const rowsByValue = new Map<string, AssetRow[]>();
 
   for (const row of rows) {
-    const value = getFilterDisplayValue(row, property, properties);
+    const value = getFilterDisplayValue(row, property, properties, options);
     const bucket = rowsByValue.get(value);
     if (bucket) {
       bucket.push(row);
@@ -86,13 +117,14 @@ export function applyColumnFilterByRowIds(
   property: PropertyConfig,
   selectedValues: Set<string>,
   hiddenRowIds: Set<string>,
-  properties: PropertyConfig[]
+  properties: PropertyConfig[],
+  options: ColumnFilterOptions = {}
 ): Set<string> {
   const next = new Set(hiddenRowIds);
   const rowIdSet = new Set(rows.map((row) => row.id));
 
   for (const row of rows) {
-    const value = getFilterDisplayValue(row, property, properties);
+    const value = getFilterDisplayValue(row, property, properties, options);
     if (selectedValues.has(value)) {
       next.delete(row.id);
     } else {
@@ -111,23 +143,31 @@ export function isColumnFilterActive(
   rows: AssetRow[],
   property: PropertyConfig,
   hiddenRowIds: Set<string>,
-  properties: PropertyConfig[]
+  properties: PropertyConfig[],
+  options: ColumnFilterOptions = {}
 ): boolean {
-  const allValues = collectColumnUniqueValues(rows, property, properties);
-  const checked = getCheckedFilterValuesForColumn(rows, property, hiddenRowIds, properties);
+  const allValues = collectColumnUniqueValues(rows, property, properties, options);
+  const checked = getCheckedFilterValuesForColumn(
+    rows,
+    property,
+    hiddenRowIds,
+    properties,
+    options
+  );
   return checked.size < allValues.length;
 }
 
 export function collectColumnUniqueValues(
   rows: AssetRow[],
   property: PropertyConfig | undefined,
-  allProperties: PropertyConfig[]
+  allProperties: PropertyConfig[],
+  options: ColumnFilterOptions = {}
 ): string[] {
   if (!property) return [];
 
   const values = new Set<string>();
   for (const row of rows) {
-    values.add(getFilterDisplayValue(row, property, allProperties));
+    values.add(getFilterDisplayValue(row, property, allProperties, options));
   }
 
   return Array.from(values).sort((a, b) => {

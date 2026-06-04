@@ -518,7 +518,7 @@ export function LibraryAssetsTable({
     applyColumnFilter,
     isColumnFiltered,
     getCheckedFilterValues,
-  } = useColumnValueFilters(resolvedRows, orderedProperties);
+  } = useColumnValueFilters(resolvedRows, orderedProperties, assetNamesCache);
 
   useEffect(() => {
     if (detailDrawerRowId && !displayRows.some((r) => r.id === detailDrawerRowId)) {
@@ -1315,6 +1315,7 @@ export function LibraryAssetsTable({
               onApplyColumnFilter={applyColumnFilter}
               isColumnFiltered={isColumnFiltered}
               getCheckedFilterValues={getCheckedFilterValues}
+              assetNamesCache={assetNamesCache}
             />
             <tbody className={styles.body}>
               {displayRows.map((row, index) => {

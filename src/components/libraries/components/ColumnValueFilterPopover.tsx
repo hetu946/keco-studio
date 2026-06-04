@@ -8,6 +8,7 @@ import {
   collectColumnUniqueValues,
   formatFilterValueLabel,
   getFilterValueInitial,
+  type ColumnFilterOptions,
 } from '@/lib/utils/columnValueFilter';
 import { getUserAvatarColor } from '@/lib/utils/avatarColors';
 import searchIcon from '@/assets/images/searchIcon.svg';
@@ -20,6 +21,7 @@ type ColumnValueFilterPopoverProps = {
   rows: AssetRow[];
   allProperties: PropertyConfig[];
   checkedValues?: Set<string>;
+  assetNamesCache?: Record<string, string>;
   onClose: () => void;
   onApply: (selectedValues: Set<string>, allValues: Set<string>) => void;
 };
@@ -52,17 +54,19 @@ export function ColumnValueFilterPopover({
   rows,
   allProperties,
   checkedValues,
+  assetNamesCache = {},
   onClose,
   onApply,
 }: ColumnValueFilterPopoverProps) {
+  const filterOptions: ColumnFilterOptions = { assetNamesCache };
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [searchText, setSearchText] = useState('');
   const [draftSelected, setDraftSelected] = useState<Set<string>>(new Set());
 
   const allValues = useMemo(() => {
     if (!property) return [];
-    return collectColumnUniqueValues(rows, property, allProperties);
-  }, [rows, property, allProperties]);
+    return collectColumnUniqueValues(rows, property, allProperties, filterOptions);
+  }, [rows, property, allProperties, assetNamesCache]);
 
   const allValuesSet = useMemo(() => new Set(allValues), [allValues]);
 
