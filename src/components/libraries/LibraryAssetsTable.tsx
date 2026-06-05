@@ -420,6 +420,7 @@ export function LibraryAssetsTable({
     referenceModalProperty,
     referenceModalValue,
     assetNamesCache,
+    mergeAssetNamesCache,
     handleOpenReferenceModal,
     handleApplyReference,
     handleCloseReferenceModal,
@@ -428,7 +429,7 @@ export function LibraryAssetsTable({
     allRowsSource,
     yRows,
     onUpdateAsset,
-    rows,
+    cacheRows: resolvedRows,
     newRowData,
     properties,
     editingCell,
@@ -1316,6 +1317,7 @@ export function LibraryAssetsTable({
               isColumnFiltered={isColumnFiltered}
               getCheckedFilterValues={getCheckedFilterValues}
               assetNamesCache={assetNamesCache}
+              onMergeAssetNamesCache={mergeAssetNamesCache}
             />
             <tbody className={styles.body}>
               {displayRows.map((row, index) => {
