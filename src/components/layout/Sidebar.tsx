@@ -24,6 +24,7 @@ import { NewLibraryModal } from "@/components/libraries/NewLibraryModal";
 import { EditLibraryModal } from "@/components/libraries/EditLibraryModal";
 import { DuplicateLibraryModal } from "@/components/libraries/DuplicateLibraryModal";
 import { ExportLibraryModal } from "@/components/libraries/ExportLibraryModal";
+import { ImportLibraryModal } from "@/components/libraries/ImportLibraryModal";
 import { NewFolderModal } from "@/components/folders/NewFolderModal";
 import { EditFolderModal } from "@/components/folders/EditFolderModal";
 import { EditAssetModal } from "@/components/asset/EditAssetModal";
@@ -119,6 +120,8 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     duplicatingLibraryId,
     showExportLibraryModal,
     exportingLibraryId,
+    showImportLibraryModal,
+    importingFolderId,
     showFolderModal,
     showEditFolderModal,
     editingFolderId,
@@ -136,6 +139,8 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     closeDuplicateLibraryModal,
     openExportLibrary,
     closeExportLibraryModal,
+    openImportLibrary,
+    closeImportLibraryModal,
     openNewFolder,
     closeFolderModal,
     openEditFolder,
@@ -853,6 +858,7 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     openEditLibrary,
     openDuplicateLibrary,
     openExportLibrary,
+    openImportLibrary,
     openEditFolder,
     openEditAsset,
     supabase,
@@ -1157,6 +1163,23 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
           libraryId={exportingLibraryId}
           libraryName={libraries.find(lib => lib.id === exportingLibraryId)?.name}
           onClose={closeExportLibraryModal}
+        />
+      )}
+
+      {importingFolderId && currentIds.projectId && (
+        <ImportLibraryModal
+          open={showImportLibraryModal}
+          projectId={currentIds.projectId}
+          folderId={importingFolderId}
+          onClose={closeImportLibraryModal}
+          onImported={(libraryId) => {
+            window.dispatchEvent(new CustomEvent('libraryCreated', {
+              detail: { folderId: importingFolderId, libraryId, projectId: currentIds.projectId }
+            }));
+            if (currentIds.projectId) {
+              router.push(`/${currentIds.projectId}/${libraryId}`);
+            }
+          }}
         />
       )}
 

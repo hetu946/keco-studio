@@ -22,7 +22,8 @@ export type UseReferenceModalParams = {
   allRowsSource: AssetRow[];
   yRows: YRowsLike;
   onUpdateAsset?: (assetId: string, assetName: string, propertyValues: Record<string, any>) => Promise<void>;
-  rows: AssetRow[];
+  /** Rows used to build reference display cache (should match table/filter data). */
+  cacheRows: AssetRow[];
   newRowData: Record<string, any>;
   properties: PropertyConfig[];
   editingCell: { rowId: string; propertyKey: string } | null;
@@ -40,7 +41,7 @@ export function useReferenceModal(params: UseReferenceModalParams) {
     allRowsSource,
     yRows,
     onUpdateAsset,
-    rows,
+    cacheRows,
     newRowData,
     properties,
     editingCell,
@@ -60,7 +61,7 @@ export function useReferenceModal(params: UseReferenceModalParams) {
       if (!supabase) return;
       try {
         const namesMap = await buildReferenceDisplayCache(supabase, {
-          rows,
+          rows: cacheRows,
           newRowData,
           properties,
           isAddingRow,
@@ -72,7 +73,12 @@ export function useReferenceModal(params: UseReferenceModalParams) {
       }
     };
     loadAssetNames();
-  }, [rows, newRowData, properties, editingCell, isAddingRow, supabase]);
+  }, [cacheRows, newRowData, properties, editingCell, isAddingRow, supabase]);
+
+  const mergeAssetNamesCache = useCallback((patch: Record<string, string>) => {
+    if (Object.keys(patch).length === 0) return;
+    setAssetNamesCache((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   useEffect(() => {
     const refreshFromSource = async (event: Event) => {
@@ -151,6 +157,7 @@ export function useReferenceModal(params: UseReferenceModalParams) {
     referenceModalValue,
     referenceModalRowId,
     assetNamesCache,
+    mergeAssetNamesCache,
     handleOpenReferenceModal,
     handleApplyReference,
     handleCloseReferenceModal,

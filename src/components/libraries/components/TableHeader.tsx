@@ -140,6 +140,10 @@ export type TableHeaderProps = {
   isColumnFiltered?: (propertyId: string) => boolean;
   /** Checked values derived from row visibility (synced across columns) */
   getCheckedFilterValues?: (propertyId: string) => Set<string>;
+  /** Resolved reference labels (same cache as table chips) */
+  assetNamesCache?: Record<string, string>;
+  /** Merge freshly resolved reference labels into the shared cache */
+  onMergeAssetNamesCache?: (patch: Record<string, string>) => void;
 };
 
 export function TableHeader({
@@ -158,6 +162,8 @@ export function TableHeader({
   onApplyColumnFilter,
   isColumnFiltered,
   getCheckedFilterValues,
+  assetNamesCache = {},
+  onMergeAssetNamesCache,
 }: TableHeaderProps) {
   const supabase = useSupabase();
   const params = useParams();
@@ -681,6 +687,8 @@ export function TableHeader({
           rows={rows}
           allProperties={existingProperties ?? groups.flatMap((group) => group.properties)}
           checkedValues={getCheckedFilterValues?.(filterTarget.property.id)}
+          assetNamesCache={assetNamesCache}
+          onMergeAssetNamesCache={onMergeAssetNamesCache}
           onClose={() => setFilterTarget({ open: false })}
           onApply={(selectedValues, allValues) => {
             if (!onApplyColumnFilter) {

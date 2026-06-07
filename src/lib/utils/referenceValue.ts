@@ -260,15 +260,19 @@ export async function buildReferenceDisplayCache(
   const assetIds = [...new Set(targets.map((t) => t.assetId))];
   const { data: assetsData, error: assetsError } = await supabase
     .from('library_assets')
-    .select('id, library_id')
+    .select('id, library_id, name')
     .in('id', assetIds);
 
   if (assetsError) throw assetsError;
 
   const libraryIdByAsset = new Map<string, string>();
+  const assetNameById = new Map<string, string>();
   const libraryIds = new Set<string>();
   for (const asset of assetsData ?? []) {
     libraryIdByAsset.set(asset.id, asset.library_id);
+    if (typeof asset.name === 'string' && asset.name.trim() !== '') {
+      assetNameById.set(asset.id, asset.name.trim());
+    }
     libraryIds.add(asset.library_id);
   }
 
@@ -295,10 +299,21 @@ export async function buildReferenceDisplayCache(
         libraryIdByAsset,
         fieldTypeById
       );
-      if (!result) return;
-      namesMap[result.cacheKey] = result.label;
+      if (result) {
+        namesMap[result.cacheKey] = result.label;
+        if (!target.fieldId) {
+          namesMap[target.assetId] = result.label;
+        }
+        return;
+      }
+
+      const fallbackName = assetNameById.get(target.assetId);
+      if (!fallbackName) return;
+
+      const cacheKey = referenceCacheKey(target.assetId, target.fieldId);
+      namesMap[cacheKey] = fallbackName;
       if (!target.fieldId) {
-        namesMap[target.assetId] = result.label;
+        namesMap[target.assetId] = fallbackName;
       }
     })
   );

@@ -17,6 +17,8 @@ export function useSidebarModals() {
   const [duplicatingLibraryId, setDuplicatingLibraryId] = useState<string | null>(null);
   const [showExportLibraryModal, setShowExportLibraryModal] = useState(false);
   const [exportingLibraryId, setExportingLibraryId] = useState<string | null>(null);
+  const [showImportLibraryModal, setShowImportLibraryModal] = useState(false);
+  const [importingFolderId, setImportingFolderId] = useState<string | null>(null);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [showEditFolderModal, setShowEditFolderModal] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -63,6 +65,15 @@ export function useSidebarModals() {
     setExportingLibraryId(null);
   }, []);
 
+  const openImportLibrary = useCallback((folderId: string) => {
+    setImportingFolderId(folderId);
+    setShowImportLibraryModal(true);
+  }, []);
+  const closeImportLibraryModal = useCallback(() => {
+    setShowImportLibraryModal(false);
+    setImportingFolderId(null);
+  }, []);
+
   const openNewFolder = useCallback(() => setShowFolderModal(true), []);
   const closeFolderModal = useCallback(() => setShowFolderModal(false), []);
   const openEditFolder = useCallback((id: string) => {
@@ -94,6 +105,8 @@ export function useSidebarModals() {
     duplicatingLibraryId,
     showExportLibraryModal,
     exportingLibraryId,
+    showImportLibraryModal,
+    importingFolderId,
     showFolderModal,
     showEditFolderModal,
     editingFolderId,
@@ -111,6 +124,8 @@ export function useSidebarModals() {
     closeDuplicateLibraryModal,
     openExportLibrary,
     closeExportLibraryModal,
+    openImportLibrary,
+    closeImportLibraryModal,
     openNewFolder,
     closeFolderModal,
     openEditFolder,

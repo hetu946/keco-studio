@@ -6,6 +6,7 @@ import styles from './ContextMenu.module.css';
 
 export type ContextMenuAction = 
   | 'export'
+  | 'import'
   | 'version-history'
   | 'star'
   | 'rename'
@@ -235,6 +236,9 @@ export function ContextMenu({ x, y, onClose, onAction, type, userRole, isProject
     return userRole === 'admin' || userRole === 'editor';
   };
 
+  // Import (creates library): admin only, same as create library
+  const canImport = () => userRole === 'admin';
+
   // Move library between folders: admin only (editor/viewer cannot)
   const canMoveLibrary = () => userRole === 'admin';
 
@@ -352,9 +356,17 @@ export function ContextMenu({ x, y, onClose, onAction, type, userRole, isProject
         </>
       );
     } else if (type === 'folder') {
-      // Folder: Rename (admin only), Duplicate, separator, Delete (admin only)
+      // Folder: Import (admin), Rename (admin), Duplicate, separator, Delete (admin)
       return (
         <>
+          {canImport() && (
+            <button
+              className={styles.menuItem}
+              onClick={() => handleAction('import')}
+            >
+              Import
+            </button>
+          )}
           {showEditButton && (
             <button
               className={styles.menuItem}

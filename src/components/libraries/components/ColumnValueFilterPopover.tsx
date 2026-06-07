@@ -8,7 +8,10 @@ import {
   collectColumnUniqueValues,
   formatFilterValueLabel,
   getFilterValueInitial,
+  type ColumnFilterOptions,
 } from '@/lib/utils/columnValueFilter';
+import { buildReferenceDisplayCache } from '@/lib/utils/referenceValue';
+import { useSupabase } from '@/lib/SupabaseContext';
 import { getUserAvatarColor } from '@/lib/utils/avatarColors';
 import searchIcon from '@/assets/images/searchIcon.svg';
 import styles from './ColumnValueFilterPopover.module.css';
@@ -20,6 +23,8 @@ type ColumnValueFilterPopoverProps = {
   rows: AssetRow[];
   allProperties: PropertyConfig[];
   checkedValues?: Set<string>;
+  assetNamesCache?: Record<string, string>;
+  onMergeAssetNamesCache?: (patch: Record<string, string>) => void;
   onClose: () => void;
   onApply: (selectedValues: Set<string>, allValues: Set<string>) => void;
 };
@@ -52,17 +57,57 @@ export function ColumnValueFilterPopover({
   rows,
   allProperties,
   checkedValues,
+  assetNamesCache = {},
+  onMergeAssetNamesCache,
   onClose,
   onApply,
 }: ColumnValueFilterPopoverProps) {
+  const supabase = useSupabase();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [searchText, setSearchText] = useState('');
   const [draftSelected, setDraftSelected] = useState<Set<string>>(new Set());
+  const [localCachePatch, setLocalCachePatch] = useState<Record<string, string>>({});
+
+  const effectiveAssetNamesCache = useMemo(
+    () => ({ ...assetNamesCache, ...localCachePatch }),
+    [assetNamesCache, localCachePatch]
+  );
+  const filterOptions: ColumnFilterOptions = { assetNamesCache: effectiveAssetNamesCache };
+
+  useEffect(() => {
+    if (!open) {
+      setLocalCachePatch({});
+      return;
+    }
+    if (!property || property.dataType !== 'reference' || !supabase) return;
+
+    let cancelled = false;
+    const loadReferenceLabels = async () => {
+      try {
+        const patch = await buildReferenceDisplayCache(supabase, {
+          rows,
+          newRowData: {},
+          properties: [property],
+          isAddingRow: false,
+        });
+        if (cancelled || Object.keys(patch).length === 0) return;
+        setLocalCachePatch(patch);
+        onMergeAssetNamesCache?.(patch);
+      } catch (e) {
+        console.error('Failed to load reference filter labels:', e);
+      }
+    };
+
+    loadReferenceLabels();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, property, rows, supabase, onMergeAssetNamesCache]);
 
   const allValues = useMemo(() => {
     if (!property) return [];
-    return collectColumnUniqueValues(rows, property, allProperties);
-  }, [rows, property, allProperties]);
+    return collectColumnUniqueValues(rows, property, allProperties, filterOptions);
+  }, [rows, property, allProperties, effectiveAssetNamesCache]);
 
   const allValuesSet = useMemo(() => new Set(allValues), [allValues]);
 
