@@ -20,6 +20,7 @@ export type UseSidebarContextMenuActionsParams = {
   openEditLibrary: (id: string) => void;
   openDuplicateLibrary: (id: string) => void;
   openExportLibrary: (id: string) => void;
+  openImportLibrary: (folderId: string) => void;
   openEditFolder: (id: string) => void;
   openEditAsset: (id: string) => void;
   supabase: SupabaseClient;
@@ -56,6 +57,7 @@ export function useSidebarContextMenuActions({
   openEditLibrary,
   openDuplicateLibrary,
   openExportLibrary,
+  openImportLibrary,
   openEditFolder,
   openEditAsset,
   supabase,
@@ -132,6 +134,17 @@ export function useSidebarContextMenuActions({
       if (action === 'export') {
         if (contextMenu.type === 'library') {
           openExportLibrary(contextMenu.id);
+          closeContextMenu();
+          return;
+        }
+        closeContextMenu();
+        return;
+      }
+
+      // Handle import action (folder: open import modal)
+      if (action === 'import') {
+        if (contextMenu.type === 'folder') {
+          openImportLibrary(contextMenu.id);
           closeContextMenu();
           return;
         }
@@ -279,6 +292,7 @@ export function useSidebarContextMenuActions({
       openEditLibrary,
       openDuplicateLibrary,
       openExportLibrary,
+      openImportLibrary,
       openEditFolder,
       openEditAsset,
       supabase,

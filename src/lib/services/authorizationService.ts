@@ -141,44 +141,45 @@ export async function getUserProjectRole(
   userId?: string
 ): Promise<'admin' | 'editor' | 'viewer'> {
   const currentUserId = userId || await getCurrentUserId(supabase);
-  
-  // Use cache
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
-  const cacheKey = `auth:project-role:${projectId}:${currentUserId}`;
-  
-  return await globalRequestCache.fetch(cacheKey, async () => {
+
+  const resolveRole = async (): Promise<'admin' | 'editor' | 'viewer'> => {
     const { data: project, error } = await supabase
       .from('projects')
       .select('owner_id')
       .eq('id', projectId)
       .single();
-    
+
     if (error || !project) {
       throw new AuthorizationError('Project not found');
     }
-    
-    // SECURITY FIX: Check collaborator role ONLY
-    // Access is determined by presence in project_collaborators table
+
     const { data: collaborator, error: collabError } = await supabase
       .from('project_collaborators')
       .select('role, accepted_at')
       .eq('project_id', projectId)
       .eq('user_id', currentUserId)
       .maybeSingle();
-    
+
     if (collabError) {
       throw new AuthorizationError('Error checking collaborator status');
     }
-    
-    // If user has a collaborator record with accepted invitation, use that role
+
     if (collaborator && collaborator.accepted_at) {
       return collaborator.role as 'admin' | 'editor' | 'viewer';
     }
-    
-    // SECURITY FIX: No access if not in collaborators table
-    // This applies even to project owners who have been removed from collaborators
+
     throw new AuthorizationError('User is not a collaborator of this project');
-  });
+  };
+
+  // API routes / server actions: never use globalRequestCache (key is not per-session).
+  if (typeof window === 'undefined') {
+    return resolveRole();
+  }
+
+  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
+  const cacheKey = `auth:project-role:${projectId}:${currentUserId}`;
+
+  return globalRequestCache.fetch(cacheKey, resolveRole);
 }
 
 /**

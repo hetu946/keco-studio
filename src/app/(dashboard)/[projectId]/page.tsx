@@ -24,6 +24,7 @@ import { EditLibraryModal } from '@/components/libraries/EditLibraryModal';
 import { NewFolderModal } from '@/components/folders/NewFolderModal';
 import { EditFolderModal } from '@/components/folders/EditFolderModal';
 import { ExportLibraryModal } from '@/components/libraries/ExportLibraryModal';
+import { ImportLibraryModal } from '@/components/libraries/ImportLibraryModal';
 import { AddLibraryMenu } from '@/components/libraries/AddLibraryMenu';
 import { ContextMenuAction } from '@/components/layout/ContextMenu';
 import { deleteLibrary } from '@/lib/services/libraryService';
@@ -59,6 +60,7 @@ export default function ProjectPage() {
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [exportLibraryId, setExportLibraryId] = useState<string | null>(null);
+  const [importFolderId, setImportFolderId] = useState<string | null>(null);
   const [assetCounts, setAssetCounts] = useState<Record<string, number>>({}); 
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [createButtonRef, setCreateButtonRef] = useState<HTMLButtonElement | null>(null);
@@ -380,6 +382,9 @@ export default function ProjectPage() {
 
   const handleFolderAction = async (folderId: string, action: ContextMenuAction) => {
     switch (action) {
+      case 'import':
+        setImportFolderId(folderId);
+        break;
       case 'rename':
         setEditingFolderId(folderId);
         setShowEditFolderModal(true);
@@ -673,6 +678,23 @@ export default function ProjectPage() {
           libraryId={exportLibraryId}
           libraryName={libraries.find(l => l.id === exportLibraryId)?.name}
           onClose={() => setExportLibraryId(null)}
+        />
+      )}
+      {importFolderId && (
+        <ImportLibraryModal
+          open={!!importFolderId}
+          projectId={projectId}
+          folderId={importFolderId}
+          onClose={() => setImportFolderId(null)}
+          onImported={(libraryId) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.folderLibraries(importFolderId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.projectFolders(projectId) });
+            window.dispatchEvent(new CustomEvent('libraryCreated', {
+              detail: { folderId: importFolderId, libraryId, projectId }
+            }));
+            setImportFolderId(null);
+            router.push(`/${projectId}/${libraryId}`);
+          }}
         />
       )}
       <NewFolderModal
