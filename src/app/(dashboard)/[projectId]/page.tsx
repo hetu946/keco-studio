@@ -28,6 +28,7 @@ import { ImportLibraryModal } from '@/components/libraries/ImportLibraryModal';
 import { AddLibraryMenu } from '@/components/libraries/AddLibraryMenu';
 import { ContextMenuAction } from '@/components/layout/ContextMenu';
 import { deleteLibrary } from '@/lib/services/libraryService';
+import { showErrorToast } from '@/lib/utils/toast';
 import { deleteFolder } from '@/lib/services/folderService';
 
 export default function ProjectPage() {
@@ -427,6 +428,20 @@ export default function ProjectPage() {
     setShowLibraryModal(true);
   };
 
+  const handleImportScript = () => {
+    // Import script to the first folder or create a default one
+    const targetFolderId = folders.length > 0 ? folders[0].id : null;
+    if (targetFolderId) {
+      window.dispatchEvent(
+        new CustomEvent('open-import-script', {
+          detail: { folderId: targetFolderId },
+        })
+      );
+    } else {
+      showErrorToast('请先创建一个文件夹');
+    }
+  };
+
   // 将页面内 LibraryToolbar 的视图模式同步到 TopBar
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -586,6 +601,7 @@ export default function ProjectPage() {
                 onClose={() => setShowCreateMenu(false)}
                 onCreateFolder={handleCreateFolder}
                 onCreateLibrary={handleCreateLibrary}
+                onImportScript={handleImportScript}
               />
             </>
           )}
