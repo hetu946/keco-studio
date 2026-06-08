@@ -10,6 +10,7 @@ type AddLibraryMenuProps = {
   onClose: () => void;
   onCreateFolder: () => void;
   onCreateLibrary: () => void;
+  onImportScript: () => void;
 };
 
 export function AddLibraryMenu({
@@ -18,6 +19,7 @@ export function AddLibraryMenu({
   onClose,
   onCreateFolder,
   onCreateLibrary,
+  onImportScript,
 }: AddLibraryMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -78,6 +80,10 @@ export function AddLibraryMenu({
       </button>
       <button className={styles.menuItem} onClick={onCreateLibrary}>
         Create new library
+      </button>
+      <div className={styles.divider} />
+      <button className={styles.menuItem} onClick={onImportScript}>
+        Import script
       </button>
     </div>,
     document.body

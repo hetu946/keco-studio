@@ -1,0 +1,467 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  padding: 1.5rem;
+  width: 560px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.close:hover {
+  opacity: 0.7;
+}
+
+.divider {
+  width: 100%;
+  height: 1px;
+  background: #e2e8f0;
+  margin: 1rem 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.hint {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.nameContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.nameLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.nameInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+}
+
+.nameInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.nameInput:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+/* Tab 切换 */
+.tabContainer {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover:not(:disabled) {
+  color: #334155;
+  background: #f8fafc;
+}
+
+.tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tabActive {
+  color: #0B99FF;
+  border-bottom-color: #0B99FF;
+}
+
+/* 文件上传区域 */
+.fileContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  border: 1px dashed #d1d5db;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.fileButton {
+  padding: 0.5rem 1.25rem;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fileButton:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #94a3b8;
+}
+
+.fileButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fileName {
+  font-size: 0.875rem;
+  color: #334155;
+  margin: 0;
+  word-break: break-all;
+}
+
+.fileHint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* 文本输入区域 */
+.textContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 200px;
+  max-height: 300px;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.textarea:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+.textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* 预览信息 */
+.preview {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+  padding: 0.5rem 0.75rem;
+  background: #f1f5f9;
+  border-radius: 0.375rem;
+}
+
+.previewLabel {
+  font-weight: 500;
+  color: #475569;
+}
+
+.previewDot {
+  color: #cbd5e1;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cancelButton {
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: #374151;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.cancelButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primaryButton {
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  background: #0B99FF;
+  color: #fff;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: #0081e6;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: importSpin 0.8s linear infinite;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+@keyframes importSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* 文本输入操作按钮 */
+.textActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.exampleButton {
+  padding: 0.375rem 0.75rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  color: #0B99FF;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exampleButton:hover:not(:disabled) {
+  background: #e0f2fe;
+  border-color: #0B99FF;
+}
+
+.exampleButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 格式说明 */
+.formatGuide {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.formatGuideToggle {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  background: #f8fafc;
+  border: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.formatGuideToggle:hover {
+  background: #f1f5f9;
+}
+
+.formatGuideHint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.formatGuideContent {
+  padding: 0.75rem;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.formatGuideTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.75rem 0;
+}
+
+.formatSection {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.formatSection:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+}
+
+.formatSectionTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 0.25rem 0;
+}
+
+.formatCode {
+  display: block;
+  padding: 0.375rem 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.75rem;
+  color: #0B99FF;
+  margin-bottom: 0.25rem;
+}
+
+.formatExample {
+  font-size: 0.6875rem;
+  color: #64748b;
+  margin: 0.125rem 0;
+}
+
+.formatNote {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  margin: 0.125rem 0 0 0;
+  font-style: italic;
+}
+
+.formatTips {
+  padding: 0.5rem 0.625rem;
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.formatTipsTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #92400e;
+  margin: 0 0 0.375rem 0;
+}
+
+.formatTipsList {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.6875rem;
+  color: #78350f;
+  line-height: 1.5;
+}
+
+.formatTipsList li {
+  margin-bottom: 0.125rem;
+}

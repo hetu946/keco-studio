@@ -25,6 +25,7 @@ import { EditLibraryModal } from "@/components/libraries/EditLibraryModal";
 import { DuplicateLibraryModal } from "@/components/libraries/DuplicateLibraryModal";
 import { ExportLibraryModal } from "@/components/libraries/ExportLibraryModal";
 import { ImportLibraryModal } from "@/components/libraries/ImportLibraryModal";
+import { ImportScriptModal } from "@/components/libraries/ImportScriptModal";
 import { NewFolderModal } from "@/components/folders/NewFolderModal";
 import { EditFolderModal } from "@/components/folders/EditFolderModal";
 import { EditAssetModal } from "@/components/asset/EditAssetModal";
@@ -147,6 +148,10 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     closeEditFolderModal,
     openEditAsset,
     closeEditAssetModal,
+    showImportScriptModal,
+    importingScriptFolderId,
+    openImportScript,
+    closeImportScriptModal,
   } = modals;
 
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -997,6 +1002,21 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     openNewLibrary();
   };
 
+  const handleImportScript = () => {
+    setShowAddMenu(false);
+    if (!currentIds.projectId) {
+      setError('Please select a project first');
+      return;
+    }
+    // Use selectedFolderId or a default folder
+    const targetFolderId = selectedFolderId || (folders.length > 0 ? folders[0].id : null);
+    if (!targetFolderId) {
+      setError('Please create a folder first');
+      return;
+    }
+    openImportScript(targetFolderId);
+  };
+
   const handleLogoClick = () => {
     // Navigate to first project if available, otherwise go to projects list
     if (projects.length > 0) {
@@ -1183,6 +1203,23 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
         />
       )}
 
+      {importingScriptFolderId && currentIds.projectId && (
+        <ImportScriptModal
+          open={showImportScriptModal}
+          projectId={currentIds.projectId}
+          folderId={importingScriptFolderId}
+          onClose={closeImportScriptModal}
+          onImported={(libraryId) => {
+            window.dispatchEvent(new CustomEvent('libraryCreated', {
+              detail: { folderId: importingScriptFolderId, libraryId, projectId: currentIds.projectId }
+            }));
+            if (currentIds.projectId) {
+              router.push(`/${currentIds.projectId}/${libraryId}`);
+            }
+          }}
+        />
+      )}
+
       <NewFolderModal
         open={showFolderModal}
         onClose={closeFolderModal}
@@ -1218,6 +1255,7 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
         onClose={() => setShowAddMenu(false)}
         onCreateFolder={handleCreateFolder}
         onCreateLibrary={handleCreateLibrary}
+        onImportScript={handleImportScript}
       />
 
       {contextMenu && (
