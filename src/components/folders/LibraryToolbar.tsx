@@ -12,7 +12,6 @@ import styles from './LibraryToolbar.module.css';
 type LibraryToolbarProps = {
   onCreateFolder?: () => void;
   onCreateLibrary?: () => void;
-  onImportScript?: () => void;
   onSearchChange?: (value: string) => void;
   viewMode?: 'list' | 'grid';
   onViewModeChange?: (mode: 'list' | 'grid') => void;
@@ -42,7 +41,6 @@ type LibraryToolbarProps = {
 export function LibraryToolbar({
   onCreateFolder,
   onCreateLibrary,
-  onImportScript,
   onSearchChange,
   viewMode = 'grid',
   onViewModeChange,
@@ -171,7 +169,6 @@ export function LibraryToolbar({
           onClose={() => setShowAddMenu(false)}
           onCreateFolder={handleCreateFolder}
           onCreateLibrary={handleCreateLibrary}
-          onImportScript={onImportScript || (() => {})}
         />
       )}
 

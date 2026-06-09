@@ -10,7 +10,6 @@ type AddLibraryMenuProps = {
   onClose: () => void;
   onCreateFolder: () => void;
   onCreateLibrary: () => void;
-  onImportScript: () => void;
 };
 
 export function AddLibraryMenu({
@@ -19,7 +18,6 @@ export function AddLibraryMenu({
   onClose,
   onCreateFolder,
   onCreateLibrary,
-  onImportScript,
 }: AddLibraryMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -52,21 +50,16 @@ export function AddLibraryMenu({
     const anchorRect = anchorElement.getBoundingClientRect();
     const menuElement = menuRef.current;
 
-    // Position menu to the right of the anchor, aligned to top
-    // Add small gap (4px) between button and menu
     const gap = 4;
     menuElement.style.position = 'fixed';
     menuElement.style.left = `${anchorRect.right + gap}px`;
     menuElement.style.top = `${anchorRect.top}px`;
-    
-    // Ensure menu doesn't overflow viewport
+
     const menuRect = menuElement.getBoundingClientRect();
     if (menuRect.right > window.innerWidth) {
-      // If menu would overflow, position it to the left of the button instead
       menuElement.style.left = `${anchorRect.left - menuRect.width - gap}px`;
     }
     if (menuRect.bottom > window.innerHeight) {
-      // Adjust if menu would overflow bottom
       menuElement.style.top = `${window.innerHeight - menuRect.height - 8}px`;
     }
   }, [open, anchorElement]);
@@ -81,12 +74,7 @@ export function AddLibraryMenu({
       <button className={styles.menuItem} onClick={onCreateLibrary}>
         Create new library
       </button>
-      <div className={styles.divider} />
-      <button className={styles.menuItem} onClick={onImportScript}>
-        Import script
-      </button>
     </div>,
     document.body
   );
 }
-

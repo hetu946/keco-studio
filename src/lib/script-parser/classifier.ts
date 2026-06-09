@@ -8,17 +8,17 @@ import type { Node, RoleMap } from './types';
 
 // 基础正则
 const SEPARATOR_RE = /^[-*]{3,}$/;
-const LABEL_RE = /^\[Label:\s*(.+?)\]$/;
+const LABEL_RE = /^\[(?:Label|标签):\s*(.+?)\]$/;
 const OPTION_RE = /^【选项\s*(\d+)\s*[：:]\s*(.+?)】$/;
 const SYSTEM_RE = /^【(.+?)】(.*)$/; // 支持 【文字】后续内容 格式
 
 // 结构化格式正则
-const STRUCT_TYPED_RE = /^（Type(\d+)・(.+?)）(.*)$/;
+const STRUCT_TYPED_RE = /^（(?:Type|类型)(\d+)・(.+?)）(.*)$/;
 const STRUCT_LABEL_RE = /^【(.+?)】$/;
 const STRUCT_INNER_LABEL_RE = /【(.+?)】/;
-const STRUCT_OPTION_RE = /^O(\d+)[：:]\s*(.+?)（([^）]+)）$/;
-const STRUCT_JUMP_RE = /^（跳转\s*(.+?)\s*）/; // 移除 $ 锚点，允许后面有内容
-const STRUCT_BRANCH_RE = /^(O\d+|Oend)\s+(分支|统一收尾)【.+?】$/;
+const STRUCT_OPTION_RE = /^(?:O(\d+)|选项(\d+))[：:]\s*(.+?)（([^）]+)）$/;
+const STRUCT_JUMP_RE = /^（(?:跳转|Jump)\s*(.+?)\s*）/i;
+const STRUCT_BRANCH_RE = /^(O\d+|选项\d+|Oend|结尾)\s+(分支|统一收尾|branch|merge)【.+?】$/i;
 
 // 变量格式正则
 const VAR_ASSIGN_RE = /^\$([a-zA-Z_]\w*)\s*([+\-\*/]?=)\s*(.+)$/;
@@ -147,7 +147,7 @@ export function classifyLine(line: string, roleMap: RoleMap = {}): Node {
   // 分支声明: O1 分支【O1｜...】 或 Oend 统一收尾【Oend｜...】
   const branchMatch = STRUCT_BRANCH_RE.exec(stripped);
   if (branchMatch) {
-    const branchLabel = branchMatch[1];
+    const branchLabel = branchMatch[1]; // O1 / 选项1 / Oend / 结尾
     const innerMatch = STRUCT_INNER_LABEL_RE.exec(stripped);
     let content = '';
     if (innerMatch) {
@@ -171,9 +171,10 @@ export function classifyLine(line: string, roleMap: RoleMap = {}): Node {
   // 结构化选项: O1：选项文本（条件，跳转...）
   const structOptMatch = STRUCT_OPTION_RE.exec(stripped);
   if (structOptMatch) {
-    const optionIndex = parseInt(structOptMatch[1], 10) - 1;
-    const optionText = structOptMatch[2];
-    let optCond = structOptMatch[3];
+    const optionNum = structOptMatch[1] || structOptMatch[2];
+    const optionIndex = parseInt(optionNum, 10) - 1;
+    const optionText = structOptMatch[3];
+    let optCond = structOptMatch[4];
 
     // Clean up escape characters: \( → (, \) → )
     optCond = optCond.replace(/\\\(/g, '(').replace(/\\\)/g, ')');
@@ -184,8 +185,8 @@ export function classifyLine(line: string, roleMap: RoleMap = {}): Node {
     const optParts = optCond.replace(/，/g, ',').split(',');
     for (const part of optParts) {
       const trimmed = part.trim();
-      if (trimmed.includes('跳转')) {
-        jumpTarget = trimmed.replace(/跳转|分支/g, '').trim();
+      if (/跳转|jump/i.test(trimmed)) {
+        jumpTarget = trimmed.replace(/跳转|jump|分支|branch/gi, '').trim();
       } else if (trimmed) {
         varChange = trimmed;
         // Clean up stray parentheses in variable

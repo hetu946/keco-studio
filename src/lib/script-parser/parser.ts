@@ -21,7 +21,7 @@ import { postProcess } from './postProcess';
 const QUOTES = '"\'""\'""「」';
 
 // Regex for splitting multiple typed dialogues on one line
-const STRUCT_TYPED_SPLIT_RE = /（Type(\d+)・(.+?)）/g;
+const STRUCT_TYPED_SPLIT_RE = /（(?:Type|类型)(\d+)・(.+?)）/g;
 
 /**
  * 拆分一行中的多个（TypeX・name）模式
@@ -37,7 +37,7 @@ function splitTypedDialogues(line: string): string[] {
   }
 
   // Check if line starts with the pattern
-  if (!line.startsWith('（Type')) {
+  if (!/^（(?:Type|类型)/.test(line)) {
     // Pattern not at start, check for mixed patterns
     return splitMixedPatterns(line);
   }
@@ -63,13 +63,13 @@ function splitTypedDialogues(line: string): string[] {
  */
 function splitMixedPatterns(line: string): string[] {
   // Pattern: （跳转 xxx）O\d+ 分支【...】
-  const jumpBranchRe = /^（跳转\s*(.+?)\s*）((?:O\d+|Oend)\s+(?:分支|统一收尾)【.+?】)$/;
+  const jumpBranchRe = /^（(?:跳转|Jump)\s*(.+?)\s*）((?:O\d+|选项\d+|Oend|结尾)\s+(?:分支|统一收尾|branch|merge)【.+?】)$/i;
   const match = jumpBranchRe.exec(line.trim());
 
   if (match) {
     const jumpTarget = match[1];
     const branchDecl = match[2];
-    return [`（跳转 ${jumpTarget}）`, branchDecl];
+    return [`（Jump ${jumpTarget}）`, branchDecl];
   }
 
   // No mixed pattern found, return as is
@@ -98,7 +98,7 @@ function isSpecialLine(line: string): boolean {
   if (/^[-*]{3,}$/.test(stripped)) return true;
 
   // Label
-  if (/^\[Label:\s*(.+?)\]$/.test(stripped)) return true;
+  if (/^\[(?:Label|标签):\s*(.+?)\]$/.test(stripped)) return true;
 
   // 选项
   if (/^【选项\s*\d+\s*[：:].+?】$/.test(stripped)) return true;
@@ -109,8 +109,8 @@ function isSpecialLine(line: string): boolean {
   // 系统提示
   if (/^【.+?】/.test(stripped)) return true;
 
-  // 结构化选项 O1：
-  if (/^O\d+[：:].+/.test(stripped)) return true;
+  // 结构化选项 O1： / 选项1：
+  if (/^(?:O\d+|选项\d+)[：:].+/.test(stripped)) return true;
 
   return false;
 }
@@ -226,8 +226,8 @@ export function parseText(text: string, roleMap: RoleMap = {}): Script {
  * 检查是否是跨行选项（以未闭合的全角括号结尾）
  */
 function isMultiLineOption(line: string): boolean {
-  // Check if line starts with O\d+：and ends with unclosed parenthesis
-  if (!/^O\d+[：:]/.test(line)) {
+  // Check if line starts with O\d+：/ 选项\d+： and ends with unclosed parenthesis
+  if (!/^(?:O\d+|选项\d+)[：:]/.test(line)) {
     return false;
   }
 
@@ -265,7 +265,7 @@ function mergeMultiLineOption(lines: string[], startIndex: number): { line: stri
     }
 
     // Check if this is a new option line (O1：, O2：, etc.)
-    if (/^O\d+[：:]/.test(nextLine)) {
+    if (/^(?:O\d+|选项\d+)[：:]/.test(nextLine)) {
       break;
     }
 

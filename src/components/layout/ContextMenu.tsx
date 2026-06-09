@@ -7,6 +7,7 @@ import styles from './ContextMenu.module.css';
 export type ContextMenuAction = 
   | 'export'
   | 'import'
+  | 'import-script'
   | 'version-history'
   | 'star'
   | 'rename'
@@ -360,12 +361,20 @@ export function ContextMenu({ x, y, onClose, onAction, type, userRole, isProject
       return (
         <>
           {canImport() && (
-            <button
-              className={styles.menuItem}
-              onClick={() => handleAction('import')}
-            >
-              Import
-            </button>
+            <>
+              <button
+                className={styles.menuItem}
+                onClick={() => handleAction('import')}
+              >
+                Import
+              </button>
+              <button
+                className={styles.menuItem}
+                onClick={() => handleAction('import-script')}
+              >
+                Import script
+              </button>
+            </>
           )}
           {showEditButton && (
             <button

@@ -1,7 +1,7 @@
 /**
  * Script Import Service
  *
- * 将解析后的剧本转换为 library 数据并存储到数据库
+ * Converts parsed script text into library rows and stores them in the database.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -11,6 +11,7 @@ import {
 import { parseText, scriptLineToRow, SCRIPT_COLUMNS } from '@/lib/script-parser';
 
 const BATCH_SIZE = 200;
+const SCRIPT_SECTION_NAME = 'Section';
 
 export type ImportScriptResult = {
   libraryId: string;
@@ -22,7 +23,7 @@ const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 /**
- * 将剧本文件导入为 library
+ * Import a script file as a new library.
  */
 export async function importScriptFromFile(
   supabase: SupabaseClient,
@@ -44,7 +45,6 @@ export async function importScriptFromFile(
 
   await verifyLibraryCreationPermission(supabase, projectId, userId);
 
-  // 验证 folder
   const { data: folder, error: folderError } = await supabase
     .from('folders')
     .select('id, project_id')
@@ -60,7 +60,6 @@ export async function importScriptFromFile(
     throw new Error('Library name is required');
   }
 
-  // 检查名称是否已存在
   const { data: existingLibraries, error: nameCheckError } = await supabase
     .from('libraries')
     .select('id')
@@ -76,7 +75,6 @@ export async function importScriptFromFile(
     throw new Error(`Library name "${trimmedName}" already exists in this folder`);
   }
 
-  // 解析剧本
   const script = parseText(fileContent, roleMap);
   const rows = script.lines.map(scriptLineToRow);
 
@@ -84,7 +82,6 @@ export async function importScriptFromFile(
     throw new Error('No valid content found in script');
   }
 
-  // 创建 library
   const { data: createdLibrary, error: createError } = await supabase
     .from('libraries')
     .insert({
@@ -105,7 +102,6 @@ export async function importScriptFromFile(
 
   const libraryId = createdLibrary.id as string;
 
-  // 创建字段定义
   const fieldIdsByColumn = new Map<string, string>();
   let fieldCount = 0;
 
@@ -115,8 +111,8 @@ export async function importScriptFromFile(
       .from('library_field_definitions')
       .insert({
         library_id: libraryId,
-        section_id: `${libraryId}:Section`,
-        section: 'Section',
+        section_id: `${libraryId}:${SCRIPT_SECTION_NAME}`,
+        section: SCRIPT_SECTION_NAME,
         label,
         description: null,
         data_type: 'string',
@@ -134,7 +130,6 @@ export async function importScriptFromFile(
     fieldCount++;
   }
 
-  // 批量插入 assets 和 values
   let rowCount = 0;
   for (let start = 0; start < rows.length; start += BATCH_SIZE) {
     const batchEnd = Math.min(start + BATCH_SIZE, rows.length);
@@ -142,7 +137,6 @@ export async function importScriptFromFile(
 
     for (let rowIdx = start; rowIdx < batchEnd; rowIdx++) {
       const row = rows[rowIdx];
-      // 使用 Label 或 Content 作为 asset name
       const assetName = (row[0] || row[3] || `Row ${rowIdx + 1}`).slice(0, 100) || `Row ${rowIdx + 1}`;
       assetRows.push({
         library_id: libraryId,
