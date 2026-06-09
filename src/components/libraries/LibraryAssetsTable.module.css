@@ -1890,19 +1890,21 @@ td.cellCopy.copyBorderRight:hover {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0.75rem 2.5rem rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(11, 153, 255, 0.35);
   z-index: 2001;
   pointer-events: auto;
+  box-sizing: border-box;
 }
 
 .assetCardHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 20px;
-  background: #0B99FF14;
-  border-bottom: 1px solid #e5e7eb;
-  border-radius: 0.5rem 8px 0 0;
+  padding: 1rem 1.25rem;
+  background: rgba(11, 153, 255, 0.08);
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: calc(0.5rem - 1px) calc(0.5rem - 1px) 0 0;
 }
 
 .assetCardTitle {
@@ -1911,26 +1913,25 @@ td.cellCopy.copyBorderRight:hover {
   color: #111827;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin: 0;
 }
 
 .assetCardCloseButton {
   background: transparent;
   border: none;
-  font-size: 1.5rem;
-  line-height: 1;
   cursor: pointer;
-  color: #6b7280;
   padding: 0;
   width: 1.5rem;
   height: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  color: #64748b;
+  transition: opacity 0.2s;
 }
 
 .assetCardCloseButton:hover {
-  color: #111827;
+  opacity: 0.7;
 }
 
 .assetCardContent {
