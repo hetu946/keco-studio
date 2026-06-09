@@ -87,11 +87,26 @@ export function LibraryListView({
 
   const handleMoreClick = (itemId: string, itemType: 'library' | 'folder', e: React.MouseEvent) => {
     e.stopPropagation();
-    // Position menu to the left of the button to avoid overflow
     const buttonRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setContextMenu({
-      x: buttonRect.left - 180, // Offset to show menu to the left of button (menu width is ~160px)
-      y: buttonRect.bottom + 4, // Position below the button with small gap
+      x: buttonRect.left - 180,
+      y: buttonRect.bottom + 4,
+      type: itemType,
+      id: itemId,
+    });
+  };
+
+  const handleRowContextMenu = (
+    itemId: string,
+    itemType: 'library' | 'folder',
+    e: React.MouseEvent,
+  ) => {
+    if (itemType !== 'folder') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
       type: itemType,
       id: itemId,
     });
@@ -142,6 +157,7 @@ export function LibraryListView({
                 key={item.id}
                 className={`${styles.tableRow} ${selectedItemId === item.id ? styles.tableRowSelected : ''}`}
                 onClick={() => handleRowClick(item)}
+                onContextMenu={(e) => handleRowContextMenu(item.id, item.type, e)}
                 onMouseEnter={() => setHoveredItemId(item.id)}
                 onMouseLeave={() => setHoveredItemId(null)}
               >

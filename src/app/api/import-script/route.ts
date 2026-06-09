@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     : await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Please sign in to continue' }, { status: 401 });
   }
 
   let formData: FormData;

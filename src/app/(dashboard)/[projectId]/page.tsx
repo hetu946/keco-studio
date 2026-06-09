@@ -25,10 +25,10 @@ import { NewFolderModal } from '@/components/folders/NewFolderModal';
 import { EditFolderModal } from '@/components/folders/EditFolderModal';
 import { ExportLibraryModal } from '@/components/libraries/ExportLibraryModal';
 import { ImportLibraryModal } from '@/components/libraries/ImportLibraryModal';
+import { ImportScriptModal } from '@/components/libraries/ImportScriptModal';
 import { AddLibraryMenu } from '@/components/libraries/AddLibraryMenu';
 import { ContextMenuAction } from '@/components/layout/ContextMenu';
 import { deleteLibrary } from '@/lib/services/libraryService';
-import { showErrorToast } from '@/lib/utils/toast';
 import { deleteFolder } from '@/lib/services/folderService';
 
 export default function ProjectPage() {
@@ -62,6 +62,7 @@ export default function ProjectPage() {
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [exportLibraryId, setExportLibraryId] = useState<string | null>(null);
   const [importFolderId, setImportFolderId] = useState<string | null>(null);
+  const [importScriptFolderId, setImportScriptFolderId] = useState<string | null>(null);
   const [assetCounts, setAssetCounts] = useState<Record<string, number>>({}); 
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [createButtonRef, setCreateButtonRef] = useState<HTMLButtonElement | null>(null);
@@ -386,6 +387,9 @@ export default function ProjectPage() {
       case 'import':
         setImportFolderId(folderId);
         break;
+      case 'import-script':
+        setImportScriptFolderId(folderId);
+        break;
       case 'rename':
         setEditingFolderId(folderId);
         setShowEditFolderModal(true);
@@ -426,20 +430,6 @@ export default function ProjectPage() {
 
   const handleCreateLibrary = () => {
     setShowLibraryModal(true);
-  };
-
-  const handleImportScript = () => {
-    // Import script to the first folder or create a default one
-    const targetFolderId = folders.length > 0 ? folders[0].id : null;
-    if (targetFolderId) {
-      window.dispatchEvent(
-        new CustomEvent('open-import-script', {
-          detail: { folderId: targetFolderId },
-        })
-      );
-    } else {
-      showErrorToast('请先创建一个文件夹');
-    }
   };
 
   // 将页面内 LibraryToolbar 的视图模式同步到 TopBar
@@ -601,7 +591,6 @@ export default function ProjectPage() {
                 onClose={() => setShowCreateMenu(false)}
                 onCreateFolder={handleCreateFolder}
                 onCreateLibrary={handleCreateLibrary}
-                onImportScript={handleImportScript}
               />
             </>
           )}
@@ -709,6 +698,23 @@ export default function ProjectPage() {
               detail: { folderId: importFolderId, libraryId, projectId }
             }));
             setImportFolderId(null);
+            router.push(`/${projectId}/${libraryId}`);
+          }}
+        />
+      )}
+      {importScriptFolderId && (
+        <ImportScriptModal
+          open={!!importScriptFolderId}
+          projectId={projectId}
+          folderId={importScriptFolderId}
+          onClose={() => setImportScriptFolderId(null)}
+          onImported={(libraryId) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.folderLibraries(importScriptFolderId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.projectFolders(projectId) });
+            window.dispatchEvent(new CustomEvent('libraryCreated', {
+              detail: { folderId: importScriptFolderId, libraryId, projectId }
+            }));
+            setImportScriptFolderId(null);
             router.push(`/${projectId}/${libraryId}`);
           }}
         />

@@ -864,6 +864,7 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     openDuplicateLibrary,
     openExportLibrary,
     openImportLibrary,
+    openImportScript,
     openEditFolder,
     openEditAsset,
     supabase,
@@ -1000,21 +1001,6 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     // selectedFolderId is already set when button is clicked
     setSelectedFolderId(null);
     openNewLibrary();
-  };
-
-  const handleImportScript = () => {
-    setShowAddMenu(false);
-    if (!currentIds.projectId) {
-      setError('Please select a project first');
-      return;
-    }
-    // Use selectedFolderId or a default folder
-    const targetFolderId = selectedFolderId || (folders.length > 0 ? folders[0].id : null);
-    if (!targetFolderId) {
-      setError('Please create a folder first');
-      return;
-    }
-    openImportScript(targetFolderId);
   };
 
   const handleLogoClick = () => {
@@ -1255,7 +1241,6 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
         onClose={() => setShowAddMenu(false)}
         onCreateFolder={handleCreateFolder}
         onCreateLibrary={handleCreateLibrary}
-        onImportScript={handleImportScript}
       />
 
       {contextMenu && (

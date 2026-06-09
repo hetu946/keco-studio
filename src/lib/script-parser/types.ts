@@ -39,6 +39,12 @@ export const SCRIPT_COLUMNS = [
   'Voice', 'Bg',
 ] as const;
 
+/** Default node label when the first line has no explicit label */
+export const DEFAULT_START_LABEL = 'Start';
+
+/** Prefix for option and jump commands in the Commands column */
+export const JUMP_PREFIX = 'Jump';
+
 export interface Script {
   lines: ScriptLine[];
 }

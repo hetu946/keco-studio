@@ -78,6 +78,15 @@ export function FolderCard({
     });
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
   const handleContextMenuAction = (action: ContextMenuAction) => {
     if (onAction) {
       onAction(folder.id, action);
@@ -92,7 +101,7 @@ export function FolderCard({
 
   return (
     <>
-      <div className={styles.card} onClick={handleCardClick}>
+      <div className={styles.card} onClick={handleCardClick} onContextMenu={handleContextMenu}>
         {/* Library tags section */}
         {libraries.length > 0 ? (
         <div className={styles.librariesSection}>

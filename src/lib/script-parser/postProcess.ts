@@ -5,30 +5,30 @@
  */
 
 import type { Node, NodeWithOptions, Script, ScriptLine } from './types';
-import { createEmptyScriptLine } from './types';
+import { createEmptyScriptLine, DEFAULT_START_LABEL, JUMP_PREFIX } from './types';
 
 /**
  * 创建指令行（表头说明）
  */
 function makeInstructionRow(): ScriptLine {
   return {
-    label: '剧情跳转的节点',
+    label: 'Story jump node',
     type: 0,
-    name: '说话人',
-    content: '对话内容及选项',
-    if: '触发条件',
-    commands: '指令',
-    fg: '左侧立绘资源',
-    fg1: '右侧立绘资源',
-    cg: '显示CG',
+    name: 'Speaker',
+    content: 'Dialogue and options',
+    if: 'Trigger condition',
+    commands: 'Story commands',
+    fg: 'Left portrait',
+    fg1: 'Right portrait',
+    cg: 'CG asset',
     option0: '',
     option0_next: '',
     option1: '',
     option1_next: '',
     option2: '',
     option2_next: '',
-    voice: '配音路径',
-    bg: '背景图',
+    voice: 'Voice path',
+    bg: 'Background',
   };
 }
 
@@ -42,13 +42,13 @@ function makeScriptLine(
 ): ScriptLine {
   const sl = createEmptyScriptLine();
 
-  // Priority: labelOverride > node.label > 'Start' for first line
+  // Priority: labelOverride > node.label > default start label for first line
   if (labelOverride) {
     sl.label = labelOverride;
   } else if (node.label) {
     sl.label = node.label;
   } else if (isFirst) {
-    sl.label = 'Start';
+    sl.label = DEFAULT_START_LABEL;
   }
 
   sl.type = node.type ?? 3;
@@ -84,22 +84,22 @@ function makeScriptLine(
 
     if (idx === 0) {
       sl.option0 = opt.option_text;
-      sl.option0_next = `Jump ${label}`;
+      sl.option0_next = `${JUMP_PREFIX} ${label}`;
     } else if (idx === 1) {
       sl.option1 = opt.option_text;
-      sl.option1_next = `Jump ${label}`;
+      sl.option1_next = `${JUMP_PREFIX} ${label}`;
     } else if (idx === 2) {
       sl.option2 = opt.option_text;
-      sl.option2_next = `Jump ${label}`;
+      sl.option2_next = `${JUMP_PREFIX} ${label}`;
     }
   }
 
   // 写入条件和变量
   if (conditions.length > 0) {
-    sl.if = conditions.join('；');
+    sl.if = conditions.join('; ');
   }
   if (variables.length > 0) {
-    sl.commands = variables.join('；');
+    sl.commands = variables.join('; ');
   }
 
   return sl;
@@ -161,9 +161,9 @@ export function postProcess(rawNodes: Node[]): Script {
       // Add as command to the previous line
       if (merged.length > 0) {
         const lastNode = merged[merged.length - 1];
-        const jumpCmd = `Jump ${node.target}`;
+        const jumpCmd = `${JUMP_PREFIX} ${node.target}`;
         lastNode.command = lastNode.command
-          ? `${lastNode.command}；${jumpCmd}`
+          ? `${lastNode.command}; ${jumpCmd}`
           : jumpCmd;
       }
       continue;
@@ -349,7 +349,7 @@ export function postProcess(rawNodes: Node[]): Script {
         if (!varCmd.startsWith('$')) {
           varCmd = '$' + varCmd;
         }
-        sl.commands = sl.commands ? `${sl.commands}；${varCmd}` : varCmd;
+        sl.commands = sl.commands ? `${sl.commands}; ${varCmd}` : varCmd;
       }
     }
   }

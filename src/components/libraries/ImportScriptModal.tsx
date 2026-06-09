@@ -23,91 +23,92 @@ type PreviewInfo = {
 
 type InputMode = 'file' | 'text';
 
-// 标准格式示例 - 按照这个格式输入可以确保解析正确
-const STANDARD_FORMAT_EXAMPLE = `【Start｜午后，狭小公寓，阳光透过窗帘洒进房间】
-（Type3・旁白）午后三点，连续通宵的阿塔那趴在键盘边小憩。
-（Type2・AI）检测到你已连续22小时未正常进食，心率偏低。
-（Type1・阿塔那）唔……别吵，还差最后一段代码。
-（Type3・旁白）屏幕侧边弹出三个互动选项。
-O1：顺从提议，出门觅食（$trust+=2，跳转O1分支）
-O2：讨价还价，再写半小时（$pally+=1，跳转O2分支）
-O3：直接耍赖，屏蔽提醒（$rely-=1，跳转O3分支）
-O1 分支【O1｜阿塔那伸懒腰起身】
-（Type1・阿塔那）行吧，难得听你一回，正好下楼逛逛。
-（Type2・AI）我提前检索周边商铺，选定一家轻食店。
-（跳转 Oend）
-O2 分支【O2｜阿塔那指尖重新落回键盘】
-（Type1・阿塔那）就半小时，定好计时器，到点立马停手。
-（Type2・AI）已设置倒计时，同时远程预定餐品。
-（跳转 Oend）
-O3 分支【O3｜阿塔那快速敲入代码】
-（Type1・阿塔那）先把提醒关掉，饮食问题我自己把控。
-（Type2・AI）权限屏蔽临时生效，但我会同步健康数据。
-（跳转 Oend）
-Oend 统一收尾【Oend｜傍晚，公寓餐桌】
-（Type2・AI）长期规律用餐后，你的工作效率上涨11%。
-（Type1・阿塔那）客观数据确实没法反驳，以后折中。
-（Type3・旁白）窗外落日染红楼宇，一人一机继续筹备后续工作。`;
+const STANDARD_FORMAT_EXAMPLE = `【Start｜Afternoon, small apartment, sunlight through the curtains】
+（Type3・Narrator）At three in the afternoon, Atana dozes beside the keyboard.
+（Type2・AI）You have not eaten properly for 22 hours. Heart rate is low.
+（Type1・Atana）Ugh... stop nagging. One more code block.
+（Type3・Narrator）Three choices appear on screen.
+O1：Go out for food（$trust+=2，jump O1 branch）
+O2：Negotiate, write for 30 more minutes（$pally+=1，jump O2 branch）
+O3：Ignore the reminder（$rely-=1，jump O3 branch）
+O1 branch【O1｜Atana stretches and stands up】
+（Type1・Atana）Fine, I'll listen for once and take a walk.
+（Type2・AI）I found a light-meal shop nearby.
+（Jump Oend）
+O2 branch【O2｜Atana's fingers return to the keyboard】
+（Type1・Atana）Thirty minutes. Set a timer.
+（Type2・AI）Timer set. Meal pre-ordered remotely.
+（Jump Oend）
+O3 branch【O3｜Atana types quickly】
+（Type1・Atana）Turn off the alerts. I'll handle meals myself.
+（Type2・AI）Alerts blocked temporarily. Health data still synced.
+（Jump Oend）
+Oend merge【Oend｜Evening, dining table】
+（Type2・AI）Regular meals improved your efficiency by 11%.
+（Type1・Atana）The data is hard to argue with. We'll compromise.
+（Type3・Narrator）Sunset paints the buildings red as work continues.`;
 
-// 格式说明内容
 const FORMAT_GUIDE = {
-  title: '标准输入格式说明',
+  title: 'Standard input format',
   sections: [
     {
-      title: '1. 场景标签',
-      format: '【标签名｜场景描述】',
-      example: '【Start｜午后，狭小公寓】',
-      note: '标签名可以是 Start、O1、O2 等',
+      title: '1. Scene label',
+      format: '【Label｜Scene description】',
+      example: '【Start｜Afternoon, small apartment】',
+      note: 'Label can be Start, O1, O2, Oend, etc.',
     },
     {
-      title: '2. 对话',
-      format: '（TypeX・角色名）对话内容',
-      example: '（Type1・阿塔那）你好世界',
-      note: 'Type 1=蓝色对话框, 2=粉色, 3=灰色(旁白), 4=无对话框, 5=全屏',
+      title: '2. Dialogue',
+      format: '（TypeX・Speaker）Dialogue text',
+      example: '（Type1・Atana）Hello world',
+      note: 'Type 1=blue, 2=pink, 3=gray narrator, 4=no box, 5=fullscreen',
     },
     {
-      title: '3. 选项',
-      format: 'O序号：选项文本（$变量+=值，跳转O序号分支）',
-      example: 'O1：选择A（$trust+=2，跳转O1分支）',
-      note: '选项必须放在选择前的对话后面',
+      title: '3. Options',
+      format: 'O#：Option text（$var+=value，jump branch）',
+      example: 'O1：Choose A（$trust+=2，jump O1 branch）',
+      note: 'Place options immediately after the dialogue that precedes the choice',
     },
     {
-      title: '4. 分支声明',
-      format: 'O序号 分支【O序号｜场景描述】',
-      example: 'O1 分支【O1｜阿塔那起身】',
-      note: '每个选项对应一个分支',
+      title: '4. Branch declaration',
+      format: 'O# branch【O#｜Scene description】',
+      example: 'O1 branch【O1｜Atana stands up】',
+      note: 'Each option maps to one branch',
     },
     {
-      title: '5. 跳转指令',
-      format: '（跳转 目标标签）',
-      example: '（跳转 Oend）',
-      note: '分支结束时跳转到统一收尾',
+      title: '5. Jump command',
+      format: '（Jump target）',
+      example: '（Jump Oend）',
+      note: 'Use at the end of a branch to merge paths',
     },
     {
-      title: '6. 统一收尾',
-      format: 'Oend 统一收尾【Oend｜场景描述】',
-      example: 'Oend 统一收尾【Oend｜傍晚，餐桌】',
-      note: '所有分支汇合的地方',
+      title: '6. Merge ending',
+      format: 'Oend merge【Oend｜Scene description】',
+      example: 'Oend merge【Oend｜Evening, dining table】',
+      note: 'Where all branches converge',
     },
   ],
   tips: [
-    '每条指令独占一行，不要在同一行写多个指令',
-    '变量格式：$变量名+=值 或 $变量名-=值',
-    '跳转目标必须与分支标签匹配',
-    'Type3 是旁白，角色名可以为空',
+    'One instruction per line; avoid multiple commands on the same line',
+    'Variables: $name+=value or $name-=value',
+    'Jump targets must match branch labels',
+    'Type 3 is narrator; speaker name can be empty',
+    'Natural formats also work: Speaker: text, - option, [Label: Start]',
   ],
 };
 
 function previewScript(text: string): PreviewInfo {
   const lines = text.split('\n').filter(l => l.trim());
   const dialogueCount = lines.filter(l => /[:：]/.test(l) && !l.trim().startsWith('【')).length;
-  const optionCount = lines.filter(l => /^\s*-\s/.test(l) || /^【选项/.test(l)).length;
+  const optionCount = lines.filter(
+    l => /^\s*-\s/.test(l) || /^【选项/.test(l) || /^O\d+[：:]/.test(l)
+  ).length;
   return { lineCount: lines.length, dialogueCount, optionCount };
 }
 
 function defaultLibraryNameFromFile(fileName: string): string {
   const base = fileName.replace(/\.[^.]+$/, '').trim();
-  return base || '导入的剧本';
+  return base || 'Imported script';
 }
 
 export function ImportScriptModal({
@@ -157,7 +158,7 @@ export function ImportScriptModal({
 
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
     if (!['txt', 'md'].includes(ext)) {
-      showErrorToast('请选择 .txt 或 .md 文件');
+      showErrorToast('Please select a .txt or .md file');
       return;
     }
 
@@ -171,14 +172,14 @@ export function ImportScriptModal({
       setPreview(previewScript(text));
     } catch {
       setPreview(null);
-      showErrorToast('读取文件失败');
+      showErrorToast('Failed to read file');
     }
   };
 
   const handleImport = async () => {
     const trimmedName = libraryName.trim();
     if (!trimmedName) {
-      showErrorToast('请输入库名称');
+      showErrorToast('Please enter a library name');
       return;
     }
 
@@ -193,19 +194,19 @@ export function ImportScriptModal({
 
     if (inputMode === 'file') {
       if (!selectedFile) {
-        showErrorToast('请选择文件');
+        showErrorToast('Please select a file');
         return;
       }
       try {
         fileContent = await selectedFile.text();
         fileName = selectedFile.name;
       } catch {
-        showErrorToast('读取文件失败');
+        showErrorToast('Failed to read file');
         return;
       }
     } else {
       if (!textInput.trim()) {
-        showErrorToast('请输入剧本文本');
+        showErrorToast('Please enter script text');
         return;
       }
       fileContent = textInput;
@@ -216,7 +217,7 @@ export function ImportScriptModal({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        throw new Error('请先登录');
+        throw new Error('Please sign in to continue');
       }
 
       const formData = new FormData();
@@ -236,14 +237,14 @@ export function ImportScriptModal({
 
       const payload = await res.json().catch(() => ({ error: res.statusText }));
       if (!res.ok) {
-        throw new Error(payload.error || '导入失败');
+        throw new Error(payload.error || 'Import failed');
       }
 
-      showSuccessToast(`剧本导入成功 (${payload.rowCount ?? 0} 行)`);
+      showSuccessToast(`Script imported (${payload.rowCount ?? 0} rows)`);
       onImported?.(payload.libraryId);
       onClose();
     } catch (e) {
-      const message = e instanceof Error ? e.message : '导入失败';
+      const message = e instanceof Error ? e.message : 'Import failed';
       showErrorToast(message);
     } finally {
       setImporting(false);
@@ -253,7 +254,7 @@ export function ImportScriptModal({
   const handleLoadStandardExample = () => {
     setTextInput(STANDARD_FORMAT_EXAMPLE);
     if (!libraryName.trim()) {
-      setLibraryName('标准格式示例');
+      setLibraryName('Standard format example');
     }
   };
 
@@ -272,7 +273,7 @@ export function ImportScriptModal({
     <div className={styles.backdrop} onClick={handleBackdropClick}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <div className={styles.title}>导入剧本</div>
+          <div className={styles.title}>Import script</div>
           <button className={styles.close} onClick={onClose} aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -283,17 +284,17 @@ export function ImportScriptModal({
         <div className={styles.divider} />
         <div className={styles.content}>
           <p className={styles.hint}>
-            将剧本文本解析为结构化脚本。支持多种书写格式：对话、选项、舞台指示、条件标注等。
+            Parse script text into structured rows. Supports dialogue, options, stage directions, conditions, and more.
           </p>
 
           <div className={styles.nameContainer}>
-            <label htmlFor="import-script-name" className={styles.nameLabel}>库名称</label>
+            <label htmlFor="import-script-name" className={styles.nameLabel}>Library name</label>
             <input
               id="import-script-name"
               className={styles.nameInput}
               value={libraryName}
               onChange={(e) => setLibraryName(e.target.value)}
-              placeholder="输入库名称"
+              placeholder="Enter library name"
               disabled={importing}
             />
           </div>
@@ -304,14 +305,14 @@ export function ImportScriptModal({
               onClick={() => setInputMode('file')}
               disabled={importing}
             >
-              文件上传
+              File upload
             </button>
             <button
               className={`${styles.tab} ${inputMode === 'text' ? styles.tabActive : ''}`}
               onClick={() => setInputMode('text')}
               disabled={importing}
             >
-              文本输入
+              Text input
             </button>
           </div>
 
@@ -331,12 +332,12 @@ export function ImportScriptModal({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
               >
-                {selectedFile ? '更换文件' : '选择文件'}
+                {selectedFile ? 'Change file' : 'Select file'}
               </button>
               {selectedFile && (
                 <p className={styles.fileName}>{selectedFile.name}</p>
               )}
-              <p className={styles.fileHint}>支持 .txt 和 .md 格式</p>
+              <p className={styles.fileHint}>.txt and .md supported</p>
             </div>
           ) : (
             <div className={styles.textContainer}>
@@ -347,30 +348,29 @@ export function ImportScriptModal({
                   onClick={handleLoadStandardExample}
                   disabled={importing}
                 >
-                  加载标准格式示例
+                  Load standard example
                 </button>
               </div>
               <textarea
                 className={styles.textarea}
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                placeholder={`按照标准格式输入剧本...\n\n点击"加载标准格式示例"查看完整示例\n或点击下方"格式说明"查看详细规则`}
+                placeholder={`Enter script in standard format...\n\nUse "Load standard example" for a full sample\nor open "Format guide" below for rules`}
                 disabled={importing}
                 rows={10}
               />
             </div>
           )}
 
-          {/* 格式说明 */}
           <div className={styles.formatGuide}>
             <button
               type="button"
               className={styles.formatGuideToggle}
               onClick={() => setShowFormatGuide(!showFormatGuide)}
             >
-              <span>{showFormatGuide ? '▼' : '▶'} 格式说明</span>
+              <span>{showFormatGuide ? '▼' : '▶'} Format guide</span>
               <span className={styles.formatGuideHint}>
-                {showFormatGuide ? '点击收起' : '点击查看标准格式'}
+                {showFormatGuide ? 'Collapse' : 'View standard format'}
               </span>
             </button>
             {showFormatGuide && (
@@ -380,12 +380,12 @@ export function ImportScriptModal({
                   <div key={idx} className={styles.formatSection}>
                     <p className={styles.formatSectionTitle}>{section.title}</p>
                     <code className={styles.formatCode}>{section.format}</code>
-                    <p className={styles.formatExample}>示例：{section.example}</p>
+                    <p className={styles.formatExample}>Example: {section.example}</p>
                     <p className={styles.formatNote}>{section.note}</p>
                   </div>
                 ))}
                 <div className={styles.formatTips}>
-                  <p className={styles.formatTipsTitle}>💡 提示</p>
+                  <p className={styles.formatTipsTitle}>Tips</p>
                   <ul className={styles.formatTipsList}>
                     {FORMAT_GUIDE.tips.map((tip, idx) => (
                       <li key={idx}>{tip}</li>
@@ -398,14 +398,14 @@ export function ImportScriptModal({
 
           {preview && (
             <div className={styles.preview}>
-              <span className={styles.previewLabel}>预览:</span>
-              <span>{preview.lineCount} 行</span>
+              <span className={styles.previewLabel}>Preview:</span>
+              <span>{preview.lineCount} lines</span>
               <span className={styles.previewDot}>·</span>
-              <span>{preview.dialogueCount} 句对话</span>
+              <span>{preview.dialogueCount} dialogues</span>
               {preview.optionCount > 0 && (
                 <>
                   <span className={styles.previewDot}>·</span>
-                  <span>{preview.optionCount} 个选项</span>
+                  <span>{preview.optionCount} options</span>
                 </>
               )}
             </div>
@@ -418,7 +418,7 @@ export function ImportScriptModal({
             onClick={onClose}
             disabled={importing}
           >
-            取消
+            Cancel
           </button>
           <button
             className={styles.primaryButton}
@@ -428,10 +428,10 @@ export function ImportScriptModal({
             {importing ? (
               <>
                 <span className={styles.spinner} aria-hidden />
-                导入中...
+                Importing...
               </>
             ) : (
-              '导入'
+              'Import'
             )}
           </button>
         </div>

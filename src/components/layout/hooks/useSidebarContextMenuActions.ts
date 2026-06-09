@@ -21,6 +21,7 @@ export type UseSidebarContextMenuActionsParams = {
   openDuplicateLibrary: (id: string) => void;
   openExportLibrary: (id: string) => void;
   openImportLibrary: (folderId: string) => void;
+  openImportScript: (folderId: string) => void;
   openEditFolder: (id: string) => void;
   openEditAsset: (id: string) => void;
   supabase: SupabaseClient;
@@ -58,6 +59,7 @@ export function useSidebarContextMenuActions({
   openDuplicateLibrary,
   openExportLibrary,
   openImportLibrary,
+  openImportScript,
   openEditFolder,
   openEditAsset,
   supabase,
@@ -141,10 +143,21 @@ export function useSidebarContextMenuActions({
         return;
       }
 
-      // Handle import action (folder: open import modal)
+      // Handle import action (folder: open library import modal)
       if (action === 'import') {
         if (contextMenu.type === 'folder') {
           openImportLibrary(contextMenu.id);
+          closeContextMenu();
+          return;
+        }
+        closeContextMenu();
+        return;
+      }
+
+      // Handle import script action (folder: open script import modal)
+      if (action === 'import-script') {
+        if (contextMenu.type === 'folder') {
+          openImportScript(contextMenu.id);
           closeContextMenu();
           return;
         }
@@ -293,6 +306,7 @@ export function useSidebarContextMenuActions({
       openDuplicateLibrary,
       openExportLibrary,
       openImportLibrary,
+      openImportScript,
       openEditFolder,
       openEditAsset,
       supabase,
