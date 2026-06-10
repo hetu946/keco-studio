@@ -15,6 +15,19 @@ export class AuthorizationError extends Error {
 }
 
 /**
+ * Client-side auth checks are cached via globalRequestCache. API routes and
+ * server actions skip the cache — the module is 'use client' and unusable on
+ * the server.
+ */
+async function withAuthCache<T>(cacheKey: string, fn: () => Promise<T>): Promise<T> {
+  if (typeof window === 'undefined') {
+    return fn();
+  }
+  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
+  return globalRequestCache.fetch(cacheKey, fn);
+}
+
+/**
  * Get the current logged-in user ID
  * @throws {AuthorizationError} if user is not logged in
  */
@@ -34,13 +47,7 @@ export async function getCurrentUserId(
     return user.id;
   };
 
-  // API routes / server actions: never use globalRequestCache (key is not per-session).
-  if (typeof window === 'undefined') {
-    return resolve();
-  }
-
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
-  return globalRequestCache.fetch('auth:current-user-id', resolve);
+  return withAuthCache('auth:current-user-id', resolve);
 }
 
 /**
@@ -53,11 +60,9 @@ export async function verifyProjectOwnership(
 ): Promise<void> {
   const currentUserId = userId || await getCurrentUserId(supabase);
   
-  // Use cache to prevent duplicate ownership verification requests
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   const cacheKey = `auth:project-ownership:${projectId}:${currentUserId}`;
-  
-  await globalRequestCache.fetch(cacheKey, async () => {
+
+  await withAuthCache(cacheKey, async () => {
     const { data: project, error } = await supabase
       .from('projects')
       .select('owner_id')
@@ -87,11 +92,9 @@ export async function verifyProjectAccess(
 ): Promise<void> {
   const currentUserId = userId || await getCurrentUserId(supabase);
   
-  // Use cache to prevent duplicate access verification requests
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   const cacheKey = `auth:project-access:${projectId}:${currentUserId}`;
-  
-  await globalRequestCache.fetch(cacheKey, async () => {
+
+  await withAuthCache(cacheKey, async () => {
     const { data: project, error } = await supabase
       .from('projects')
       .select('owner_id')
@@ -171,15 +174,8 @@ export async function getUserProjectRole(
     throw new AuthorizationError('User is not a collaborator of this project');
   };
 
-  // API routes / server actions: never use globalRequestCache (key is not per-session).
-  if (typeof window === 'undefined') {
-    return resolveRole();
-  }
-
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   const cacheKey = `auth:project-role:${projectId}:${currentUserId}`;
-
-  return globalRequestCache.fetch(cacheKey, resolveRole);
+  return withAuthCache(cacheKey, resolveRole);
 }
 
 /**
@@ -192,11 +188,9 @@ export async function verifyLibraryAccess(
 ): Promise<void> {
   const currentUserId = userId || await getCurrentUserId(supabase);
   
-  // Use cache to prevent duplicate library access verification
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   const cacheKey = `auth:library-access:${libraryId}:${currentUserId}`;
-  
-  await globalRequestCache.fetch(cacheKey, async () => {
+
+  await withAuthCache(cacheKey, async () => {
     // Get the project that owns the library
     const { data: library, error: libraryError } = await supabase
       .from('libraries')
@@ -230,11 +224,9 @@ export async function verifyFolderAccess(
 ): Promise<void> {
   const currentUserId = userId || await getCurrentUserId(supabase);
   
-  // Use cache to prevent duplicate folder access verification
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   const cacheKey = `auth:folder-access:${folderId}:${currentUserId}`;
-  
-  await globalRequestCache.fetch(cacheKey, async () => {
+
+  await withAuthCache(cacheKey, async () => {
     // Get the project that owns the folder
     const { data: folder, error: folderError } = await supabase
       .from('folders')
@@ -263,11 +255,9 @@ export async function verifyAssetAccess(
 ): Promise<void> {
   const currentUserId = userId || await getCurrentUserId(supabase);
   
-  // Use cache to prevent duplicate asset access verification
-  const { globalRequestCache } = await import('@/lib/hooks/useRequestCache');
   const cacheKey = `auth:asset-access:${assetId}:${currentUserId}`;
-  
-  await globalRequestCache.fetch(cacheKey, async () => {
+
+  await withAuthCache(cacheKey, async () => {
     // Get the library that owns the asset
     const { data: asset, error: assetError } = await supabase
       .from('library_assets')

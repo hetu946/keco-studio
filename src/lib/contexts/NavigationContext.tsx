@@ -21,9 +21,12 @@ type BreadcrumbItem = {
 type NavigationContextType = {
   breadcrumbs: BreadcrumbItem[];
   currentProjectId: string | null;
+  currentProjectName: string | null;
   currentLibraryId: string | null;
+  currentLibraryName: string | null;
   currentAssetId: string | null;
   currentFolderId: string | null;
+  currentFolderName: string | null;
   isPredefinePage: boolean;
   isLibraryPage: boolean;
   showCreateProjectBreadcrumb: boolean;
@@ -528,9 +531,12 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const value: NavigationContextType = {
     breadcrumbs: buildBreadcrumbs(),
     currentProjectId,
+    currentProjectName: projectName,
     currentLibraryId,
+    currentLibraryName: libraryName,
     currentAssetId,
     currentFolderId,
+    currentFolderName: folderName,
     isPredefinePage: routeParams.isPredefinePage,
     isLibraryPage: routeParams.isLibraryPage,
     showCreateProjectBreadcrumb,
