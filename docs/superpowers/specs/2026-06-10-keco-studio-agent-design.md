@@ -126,6 +126,8 @@ interface ToolResult {
 | `import_script` | write | LLM conversion + parseText + import (from spec.md pipeline) |
 | `set_conversation_option` | write | Set conversation-level options (e.g. skipConfirmation) |
 
+**Category rule**: ALL `write` tools require confirmation by default. `read` tools never require confirmation. `set_conversation_option` is a special case — it is `write` category but the confirmation flow applies to itself (user must confirm enabling skip-mode).
+
 ### Tool Registration
 
 ```typescript
@@ -160,7 +162,10 @@ Write tools pause before execution. A `confirmation_request` SSE event is pushed
 
 ### Pending Action Store
 
-Server-side in-memory Map keyed by conversationId:
+Two-layer storage:
+
+- **In-memory Map** (fast lookup during active SSE): keyed by actionId, holds the suspended `messages` snapshot and `pendingToolCall` needed to resume the ReAct loop.
+- **Database `agent_pending_actions` table** (durable): stores actionId, conversationId, toolName, args, status. Survives server restarts between SSE close and user confirm.
 
 ```typescript
 interface PendingAction {
@@ -168,12 +173,12 @@ interface PendingAction {
   conversationId: string;
   toolName: string;
   args: unknown;
-  createdAt: number;
   status: "pending" | "approved" | "rejected";
+  createdAt: number;
 }
 ```
 
-TTL: 30 minutes, then auto-cleaned.
+TTL: 30 minutes, then auto-cleaned from both memory and DB.
 
 ### Sequence (Short Connection)
 
@@ -333,6 +338,16 @@ async function runAgentTurn(input: AgentTurnInput): AsyncGenerator<SSEEvent> {
 
       for (const call of response.tool_calls) {
         const tool = resolveTool(call.function.name);
+
+        // Unknown tool → feed error back to LLM
+        if (!tool) {
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: JSON.stringify({ success: false, error: `Unknown tool "${call.function.name}". Available tools: ${allTools.map(t => t.name).join(", ")}` }),
+          });
+          continue;
+        }
 
         // Write tool + confirmation not skipped → request confirmation
         if (tool.category === "write" && !input.conversationMeta.skipConfirmation) {
@@ -644,10 +659,21 @@ src/components/agent/
 ### Database Changes
 
 ```sql
--- 3 new tables
+-- 4 new tables
 agent_conversations    -- Conversation metadata
 agent_messages         -- Message history (including tool_calls)
+agent_pending_actions  -- Suspended actions awaiting confirmation
 agent_traces           -- Audit traces
+
+CREATE TABLE agent_pending_actions (
+  id uuid PRIMARY KEY,
+  conversation_id uuid REFERENCES agent_conversations(id),
+  tool_name text NOT NULL,
+  args jsonb NOT NULL,
+  status text DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
+  created_at timestamptz DEFAULT now(),
+  expires_at timestamptz DEFAULT now() + interval '30 minutes'
+);
 ```
 
 ### Environment Variables
