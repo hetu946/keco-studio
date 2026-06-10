@@ -134,11 +134,14 @@ interface AgentTool {
 interface ToolContext {
   userId: string;
   projectId: string;
-  currentFolderId?: string;   // From current page context
-  currentLibraryId?: string;  // From current page context
+  currentFolderId?: string;   // Injected from page context (user is viewing a folder)
+  currentLibraryId?: string;  // Injected from page context (user is viewing a library)
   supabase: SupabaseClient;
   userRole: "admin" | "editor" | "viewer"; // From authorizationService
 }
+// currentFolderId/currentLibraryId are passed in the POST /api/agent-chat request body,
+// populated by the frontend from the current route/page state.
+// If empty, tools that need them (e.g. import_script) should ask the user via LLM reply.
 
 interface ToolResult {
   success: boolean;
@@ -172,10 +175,12 @@ interface ToolResult {
 
 `create_asset` and `update_asset` accept semantic field names (e.g. `{"类型": "character", "标签": "NPC"}`). Tool handler internally:
 
-1. Fetch library field definitions: `getLibraryFields(supabase, libraryId)`
+1. Query `library_field_definitions` table for the target library (same data source as the schema/predefine page)
 2. Build name→fieldId map: `{ "类型": "uuid-abc", "标签": "uuid-def" }`
 3. Translate LLM's params to `{ "uuid-abc": "character", "uuid-def": "NPC" }`
 4. If field name not found → return error with available field names → LLM adapts
+
+Encapsulated in `src/lib/agent/field-resolver.ts`.
 
 ### Tool Registration
 
@@ -473,11 +478,13 @@ async function* runAgentTurn(input: AgentTurnInput): AsyncGenerator<SSEEvent> {
     }
     if (currentToolCall) toolCalls.push(currentToolCall as ToolCall);
 
-    // Save assistant message
+    // Save assistant message (text part only — tool_calls are NOT persisted until after confirmation)
+    // Rationale: if we persist tool_calls before confirmation, a page refresh shows
+    // "assistant initiated tool_call with no result" which is confusing.
+    // The tool_call lives only in suspended_state until resume completes.
     await saveMessage(input.conversationId, {
       role: "assistant",
       content: assistantContent,
-      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
     });
 
     // 1. Text response → done
@@ -585,13 +592,15 @@ Response: SSE stream (same protocol as /api/agent-chat)
 
 1. Load pending action from DB
 2. Load suspended_state (messages + pendingToolCall + optional toolResult)
-3. If approved:
-   - pre_execute: execute tool → push tool_result → continue loop
-   - post_preview: execute final import (mutating) using saved toolResult → push result → continue loop
-   - meta: update conversation meta → push result → continue loop
-4. If rejected:
-   - Push "user cancelled" as tool_result → continue loop
-5. Delete pending action
+3. Persist the assistant message WITH tool_calls now (was deferred during suspend):
+   saveMessage(conversationId, { role: "assistant", content: "", tool_calls: [pendingToolCall] })
+4. If approved:
+   - pre_execute: execute tool → save tool_result message → push tool_result SSE → continue loop
+   - post_preview: execute final import (mutating) using saved toolResult → save tool_result → push SSE → continue loop
+   - meta: update conversation meta → save tool_result → push SSE → continue loop
+5. If rejected:
+   - Save "user cancelled" as tool_result message → push SSE → continue loop
+6. Delete pending action
 ```
 
 ### System Prompt
@@ -613,7 +622,7 @@ RULES:
 6. Branch labels use letter O + digit (O1, O2, Oend), never 01, 02.
 7. When the user says "skip confirmation" or equivalent, call set_conversation_option to enable skip mode.
 8. For create/update_asset, use semantic field names (e.g. "类型", "标签") — the system resolves them to internal IDs.
-9. For import_script, you MUST provide folderId. If unknown, ask the user or use query_assets to find available folders.
+9. For import_script, use the currentFolderId from context. If it is empty, ask the user which folder to import into — do NOT guess.
 
 CURRENT CONTEXT:
 - Project: {projectName}
@@ -715,6 +724,33 @@ Both paths end at `parseText()` + `scriptImportService`. Agent path adds LLM pre
 
 **Note**: import_script preview is NEVER skipped by `skipConfirmation`. User always sees the preview before import.
 
+### characterMapping → roleMap Conversion
+
+The tool schema accepts `{ "Atana": 1, "AI": 2 }` (name → type number). `scriptImportService` expects `roleMap: Record<string, { id: string; type: number }>`.
+
+Tool handler converts internally:
+```typescript
+// LLM provides: { "Atana": 1, "AI": 2 }
+// Convert to: { "Atana": { id: "", type: 1 }, "AI": { id: "", type: 2 } }
+// id is left empty — scriptImportService resolves it from the character name
+```
+
+### executeImport — Internal Convention
+
+`import_script` tool has two phases: `execute()` (non-mutating conversion) and `executeImport()` (mutating DB write). This is an **internal module convention** — the generic `AgentTool` interface only declares `execute()`. The ReAct loop does NOT need to know about `executeImport`. The confirmation resume handler in `/api/agent-chat/confirm` calls `executeImport` directly for `post_preview` tools with a saved `toolResult`.
+
+### "Edit in Import Modal" Handoff Protocol
+
+When user clicks [Edit in Import Modal] on the preview card:
+
+1. ChatPanel dispatches a custom event: `window.dispatchEvent(new CustomEvent("agent:open-import-modal", { detail: { folderId, libraryName, fullText } }))`
+2. Layout-level listener opens `ImportScriptModal` with pre-filled textarea
+3. User edits and imports via existing modal flow
+4. On successful import, modal dispatches: `window.dispatchEvent(new CustomEvent("agent:import-complete", { detail: { libraryName } }))`
+5. ChatPanel listens for this event and appends a tool_result message: "User imported '{libraryName}' via Import Modal"
+
+If the user closes the modal without importing, no message is appended — the pending action is simply marked as rejected.
+
 ---
 
 ## 8. Error Handling & Limits
@@ -758,16 +794,15 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
 
 ### Rate Limits
 
-```typescript
-interface RateLimits {
-  maxTurnsPerMinute: 10;     // Per user
-  maxToolCallsPerTurn: 1;    // parallel_tool_calls: false
-  maxTokensPerDay: 500_000;  // Per user
-}
-```
+**v1 scope (honest):**
+- `maxToolCallsPerTurn: 1` — enforced by `parallel_tool_calls: false` in LLM API call
+- `maxIterations: 10` — enforced in ReAct loop (prevents infinite tool_call chains)
 
-- v1: stored in `agent_conversations.meta` (simple per-conversation counters)
-- Exceeding limits returns a friendly error message, not a raw HTTP error
+**Deferred to v2 (Future Work):**
+- `maxTurnsPerMinute: 10` per user — requires `agent_usage_counters` table
+- `maxTokensPerDay: 500_000` per user — same
+
+Rationale: per-user rate limits need a dedicated counter table (not `agent_conversations.meta`, which is per-conversation and bypassable). Defer until usage justifies the complexity.
 
 ### Audit Traces
 
@@ -844,6 +879,25 @@ CREATE TABLE agent_traces (
 
 Deletes a conversation and its messages.
 
+### GET /api/agent-chat/conversations/:id/messages
+
+**Request:** Query params: `cursor?` (ISO timestamp), `limit?` (default 50, max 200)
+
+**Response:**
+```typescript
+{
+  messages: Array<{
+    id: string;
+    role: "user" | "assistant" | "tool";
+    content: unknown;    // Full message body
+    createdAt: string;
+  }>;
+  nextCursor?: string;   // Omit if no more pages
+}
+```
+
+Used when switching conversations in ChatPanel to load history.
+
 ---
 
 ## 10. Database Changes
@@ -914,11 +968,28 @@ ALTER TABLE agent_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_pending_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_traces ENABLE ROW LEVEL SECURITY;
 
--- agent_conversations: user owns their conversations, and must have access to the project
+-- Helper: check user has access to project (owner or collaborator)
+-- Inline subquery used in policies below:
+--   project_id IN (SELECT project_id FROM projects WHERE owner_id = auth.uid())
+--   OR project_id IN (SELECT project_id FROM project_collaborators WHERE user_id = auth.uid())
+
+-- agent_conversations: user owns their conversations AND has access to the project
 CREATE POLICY "Users can view own conversations" ON agent_conversations
-  FOR SELECT USING (user_id = auth.uid());
+  FOR SELECT USING (
+    user_id = auth.uid()
+    AND (
+      project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+      OR project_id IN (SELECT project_id FROM project_collaborators WHERE user_id = auth.uid())
+    )
+  );
 CREATE POLICY "Users can insert own conversations" ON agent_conversations
-  FOR INSERT WITH CHECK (user_id = auth.uid());
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    AND (
+      project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+      OR project_id IN (SELECT project_id FROM project_collaborators WHERE user_id = auth.uid())
+    )
+  );
 CREATE POLICY "Users can update own conversations" ON agent_conversations
   FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own conversations" ON agent_conversations
@@ -935,14 +1006,29 @@ CREATE POLICY "Users can insert messages to own conversations" ON agent_messages
   );
 
 -- agent_pending_actions: same pattern
-CREATE POLICY "Users can manage own pending actions" ON agent_pending_actions
-  FOR ALL USING (
+CREATE POLICY "Users can view own pending actions" ON agent_pending_actions
+  FOR SELECT USING (
+    conversation_id IN (SELECT id FROM agent_conversations WHERE user_id = auth.uid())
+  );
+CREATE POLICY "Users can insert own pending actions" ON agent_pending_actions
+  FOR INSERT WITH CHECK (
+    conversation_id IN (SELECT id FROM agent_conversations WHERE user_id = auth.uid())
+  );
+CREATE POLICY "Users can update own pending actions" ON agent_pending_actions
+  FOR UPDATE USING (
     conversation_id IN (SELECT id FROM agent_conversations WHERE user_id = auth.uid())
   );
 
--- agent_traces: owner + project admins
+-- agent_traces: owner can view; project admins can view project traces
 CREATE POLICY "Users can view own traces" ON agent_traces
   FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Project admins can view project traces" ON agent_traces
+  FOR SELECT USING (
+    conversation_id IN (
+      SELECT id FROM agent_conversations
+      WHERE project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+    )
+  );
 ```
 
 ---
@@ -1012,10 +1098,10 @@ DEEPSEEK_API_KEY=sk-xxx
 
 | Phase | Content | Validation |
 |-------|---------|-----------|
-| **Phase 1: Skeleton** | Auth alignment, `maxDuration`, types, `llm-client.ts` (streaming), `core.ts` (ReAct loop, no tools), ChatPanel UI, SSE connection, conversation persistence | Type in ChatPanel → LLM streams reply. Auth works with both cookie and Bearer. `maxDuration = 60` confirmed. |
-| **Phase 2: Read tools** | `query_assets` + `query_script_lines` + field-resolver + `displayHint: "table"` UI contract | "What characters are in this project?" returns real data in table format. Script line query returns branch structure. |
-| **Phase 3: Write tools + confirmation** | `create_asset` + `update_asset` + `delete_asset` + `pre_execute` confirmation flow + `set_conversation_option` + cache invalidation + permission checks (Viewer read-only) + RLS migration | Create/update/delete through confirmation flow. Viewer gets error on write. skipConfirmation works. Data appears on page after write. Multi-instance confirm tested. |
-| **Phase 4: Import script** | `import_script` tool + `post_preview` flow + ScriptPreviewCard + integration with ImportScriptModal + folderId handling | Paste prose → preview card → import success. Preview not skippable. Edit-in-modal works. LLM retry on validation failure. |
+| **Phase 1: Skeleton** | Auth alignment, `maxDuration`, types, `llm-client.ts` (streaming), `core.ts` (ReAct loop, no tools), ChatPanel UI, SSE connection, conversation persistence, messages API | Type in ChatPanel → LLM streams reply. Auth works with both cookie and Bearer. `maxDuration = 60` confirmed. Conversation history loadable via GET /conversations/:id/messages. |
+| **Phase 2: Read tools** | `query_assets` + `query_script_lines` + field-resolver + `displayHint: "table"` UI contract | "What characters are in this project?" returns real data in table format. Script line query: reads library rows via `getLibraryAssetsWithProperties` + `library_field_definitions` column mapping (reverse of import's `fieldIdsByColumn`), outputs structured `{ label, type, name, content, options, jump }` per line. Non-script library returns clear error. |
+| **Phase 3: Write tools + confirmation** | `create_asset` + `update_asset` + `delete_asset` + `pre_execute` confirmation flow + `set_conversation_option` + cache invalidation + permission checks (Viewer read-only) + RLS migration | Create/update/delete through confirmation flow. Viewer gets error on write. skipConfirmation works. Multi-instance confirm tested. **UI refresh**: ideal path — write tool calls same Yjs transact + Realtime broadcast as `LibraryDataContext.createAsset`; fallback — ChatPanel shows "Data updated — please refresh". Verify ideal path works when library page is already open. |
+| **Phase 4: Import script** | `import_script` tool + `post_preview` flow + ScriptPreviewCard + integration with ImportScriptModal + folderId handling + Edit-in-Modal handoff protocol | Paste prose → preview card → import success. Preview not skippable. Edit-in-modal: preview card dispatches `agent:open-import-modal` event → modal opens pre-filled → on success dispatches `agent:import-complete` → ChatPanel appends confirmation message. LLM retry on validation failure. |
 
 Each phase follows TDD: write tests first, then implement.
 
@@ -1024,9 +1110,10 @@ Each phase follows TDD: write tests first, then implement.
 ## 13. Future Work (Out of Scope for v1)
 
 - `query_table` with whitelist-based access (if query_assets + query_script_lines prove insufficient)
-- Streaming LLM tool call accumulation optimization
-- Rate limit storage in Redis / dedicated table
-- Trace auto-archival cron job
+- `list_folders` tool (v1 relies on ToolContext.currentFolderId + UI fallback)
+- Per-user rate limits (`maxTurnsPerMinute`, `maxTokensPerDay`) with `agent_usage_counters` table
+- Streaming LLM tool call accumulation optimization (v1 accumulates full response before processing)
+- Trace auto-archival cron job (90-day retention)
 - Conversation search / export
 - Multi-language system prompt
 - Voice input
