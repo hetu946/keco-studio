@@ -2,9 +2,7 @@
 
 import React, { useCallback } from 'react';
 import Image from 'next/image';
-import { Avatar } from 'antd';
 import type { PropertyConfig } from '@/lib/types/libraryAssets';
-import { getAssetAvatarColor, getAssetAvatarText } from '@/components/libraries/utils/libraryAssetUtils';
 import {
   normalizeReferenceSelections,
   resolveReferenceSelectionLabel,
@@ -65,19 +63,11 @@ export const ReferenceField = React.memo<ReferenceFieldProps>(function Reference
   const visibleSelections = displaySelections.slice(0, 5);
   const extraCount = Math.max(0, displaySelections.length - visibleSelections.length);
 
-  const getAssetName = (selection: {
+  const getSelectionLabel = (selection: {
     assetId: string;
     fieldId?: string | null;
     displayValue?: string | null;
   }) => resolveReferenceSelectionLabel(selection, assetNamesCache);
-
-  // Expand pill so each avatar tile (1.375rem) fits; base 3.25rem covers 1 avatar + "+" tile.
-  const pillWidthStyle: React.CSSProperties | undefined =
-    visibleSelections.length <= 1
-      ? undefined
-      : {
-        width: `calc(3.25rem + ${visibleSelections.length - 1} * 1.375rem)`,
-      };
 
   const setAvatarRef = useCallback(
     (assetId: string) => (el: HTMLDivElement | null) => {
@@ -115,69 +105,45 @@ export const ReferenceField = React.memo<ReferenceFieldProps>(function Reference
     >
       {hasValues ? (
         <div
-          className={styles.referenceSelectedAssetLeft}
-          data-reference-background="true"
-          style={pillWidthStyle}
+          className={styles.referenceValueList}
           onClick={handleClick}
           onMouseDown={handleMouseDown}
           onDoubleClick={handleDoubleClick}
         >
-          <div className={styles.referenceAvatarsStack}>
-            {visibleSelections.map((selection, idx) => {
-              const id = selection.assetId;
-              const name = getAssetName(selection);
-              return (
-                <div
-                  key={`${id}-${selection.fieldId || 'legacy'}-${idx}`}
-                  ref={setAvatarRef(id)}
-                  onMouseEnter={(e) => {
-                    e.stopPropagation();
-                    onAvatarMouseEnter(
-                      id,
-                      e.currentTarget,
-                      [
-                        {
-                          fieldLabel: selection.fieldLabel,
-                          displayValue: selection.displayValue,
-                        },
-                      ]
-                    );
-                  }}
-                  onMouseLeave={(e) => {
-                    e.stopPropagation();
-                  }}
-                  className={`${styles.referenceAvatarWrapper} ${styles.referenceAvatarStackItem}`}
-                  style={{}}
-                >
-                  <Avatar
-                    size={16}
-                    style={{
-                      backgroundColor: getAssetAvatarColor(id, name),
-                      borderRadius: '2.4px',
-                    }}
-                    className={styles.referenceAvatar}
-                  >
-                    {getAssetAvatarText(name)}
-                  </Avatar>
-                  {idx === visibleSelections.length - 1 && extraCount > 0 ? (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: -6,
-                        right: -8,
-                        fontSize: 10,
-                        color: '#0B99FF',
-                        fontWeight: 700,
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      +{extraCount}
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+          {visibleSelections.map((selection, idx) => {
+            const id = selection.assetId;
+            const label = getSelectionLabel(selection);
+            return (
+              <div
+                key={`${id}-${selection.fieldId || 'legacy'}-${idx}`}
+                ref={setAvatarRef(id)}
+                data-reference-background="true"
+                onMouseEnter={(e) => {
+                  e.stopPropagation();
+                  onAvatarMouseEnter(
+                    id,
+                    e.currentTarget,
+                    [
+                      {
+                        fieldLabel: selection.fieldLabel,
+                        displayValue: selection.displayValue,
+                      },
+                    ]
+                  );
+                }}
+                onMouseLeave={(e) => {
+                  e.stopPropagation();
+                }}
+                className={styles.referenceValuePill}
+                title={label}
+              >
+                <span className={styles.referenceValueText}>{label}</span>
+                {idx === visibleSelections.length - 1 && extraCount > 0 ? (
+                  <span className={styles.referenceValueExtraCount}>+{extraCount}</span>
+                ) : null}
+              </div>
+            );
+          })}
           <div className={`${styles.referenceIconTile} ${styles.referenceArrowTile}`}>
             <Image
               src={referenceAddIcon}
