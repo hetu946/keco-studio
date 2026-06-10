@@ -5,6 +5,8 @@ import { TopBar } from './TopBar';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import AuthForm from '@/components/authform/AuthForm';
 import { SimulationOriginWarmup } from '@/components/simulation/SimulationOriginWarmup';
+import { ChatPanel } from '@/components/agent/ChatPanel';
+import { AgentImportBridge } from '@/components/agent/AgentImportBridge';
 import styles from './DashboardLayout.module.css';
 import { useEffect, useRef, useState } from 'react';
 
@@ -62,6 +64,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </div>
+      <ChatPanel />
+      <AgentImportBridge />
     </div>
   );
 }

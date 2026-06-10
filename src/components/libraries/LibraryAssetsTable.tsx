@@ -27,6 +27,7 @@ import { useCellSelection, type CellKey } from './hooks/useCellSelection';
 import { useUserRole } from './hooks/useUserRole';
 import { useYjsSync } from './hooks/useYjsSync';
 import { useYjs } from '@/lib/contexts/YjsContext';
+import { persistActiveSection } from '@/lib/agent/page-context';
 import { useAssetHover } from './hooks/useAssetHover';
 import { useRowOperations } from './hooks/useRowOperations';
 import { useReferenceModal } from './hooks/useReferenceModal';
@@ -550,6 +551,22 @@ export function LibraryAssetsTable({
     () => groups.find((g) => g.section.id === effectiveActiveSectionId) ?? groups[0],
     [groups, effectiveActiveSectionId]
   );
+
+  // Broadcast active section to ChatPanel / agent context.
+  useEffect(() => {
+    if (!library?.id || !activeGroup) return;
+    persistActiveSection(library.id, activeGroup.section.id, activeGroup.section.name);
+    window.dispatchEvent(
+      new CustomEvent('library:active-section', {
+        detail: {
+          libraryId: library.id,
+          sectionId: activeGroup.section.id,
+          sectionName: activeGroup.section.name,
+        },
+      })
+    );
+  }, [library?.id, activeGroup?.section.id, activeGroup?.section.name]);
+
   const activeProperties = activeGroup ? activeGroup.properties : orderedProperties;
   const resizeColumnKeys = useMemo(
     () => [NUMBER_COLUMN_KEY, ...activeProperties.map((property) => property.id)],
