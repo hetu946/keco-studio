@@ -66,7 +66,7 @@ export function ChatPanel() {
     ]
   );
 
-  const { items, isStreaming, conversationId, send, confirm, startNewConversation, loadConversation } =
+  const { items, isStreaming, conversationId, send, confirm, startNewConversation, loadConversation, appendNote } =
     useAgentChat(ctx);
 
   useEffect(() => {
@@ -76,13 +76,14 @@ export function ChatPanel() {
 
   // Append a note when an import completes via the handoff to ImportScriptModal.
   useEffect(() => {
-    const handler = () => {
-      // The conversation will be reloaded on next interaction; we just refresh
-      // the conversation list state implicitly. No-op placeholder for now.
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ libraryId?: string; libraryName?: string }>).detail;
+      const name = detail?.libraryName || 'unknown';
+      appendNote(`✅ Library "${name}" has been imported via Import Modal.`);
     };
     window.addEventListener('agent:import-complete', handler as EventListener);
     return () => window.removeEventListener('agent:import-complete', handler as EventListener);
-  }, []);
+  }, [appendNote]);
 
   if (!currentProjectId) return null;
 

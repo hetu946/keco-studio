@@ -320,6 +320,13 @@ export function useAgentChat(ctx: SendContext) {
     [getToken]
   );
 
+  const appendNote = useCallback(
+    (text: string) => {
+      appendItem({ id: nextId(), role: 'assistant', text });
+    },
+    [appendItem]
+  );
+
   return {
     items,
     isStreaming,
@@ -328,6 +335,7 @@ export function useAgentChat(ctx: SendContext) {
     confirm,
     startNewConversation,
     loadConversation,
+    appendNote,
   };
 }
 
