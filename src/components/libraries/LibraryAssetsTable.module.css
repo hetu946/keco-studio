@@ -1651,6 +1651,52 @@ td.cellCopy.copyBorderRight:hover {
   display: inline-block;
 }
 
+.referenceValueList {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.referenceValuePill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  height: 1.5rem;
+  max-width: 7.5rem;
+  padding: 0 0.375rem;
+  background: #EEEEEE;
+  border-radius: 5px;
+  box-sizing: border-box;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.referenceValuePill:hover {
+  background: #0B99FF14;
+}
+
+.referenceValueText {
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.referenceValueExtraCount {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  color: #0B99FF;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .referenceSelectedAssetLeft {
   display: flex;
   align-items: center;
@@ -1688,7 +1734,8 @@ td.cellCopy.copyBorderRight:hover {
   background: #EEEEEE;
 }
 
-.referenceSelectedAssetLeft:hover {
+.referenceSelectedAssetLeft:hover,
+.referenceValueList:hover .referenceIconTile {
   background: #0B99FF14;
 }
 
