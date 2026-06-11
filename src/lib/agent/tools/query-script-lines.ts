@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { getLibraryAssets } from '../data-access';
 import { SCRIPT_COLUMNS } from '@/lib/script-parser';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { findLibraryByName, getLibraryProperties } from './_shared';
+import { getLibraryProperties, resolveLibraryForTool } from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -30,13 +30,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
-  const { library, available } = await findLibraryByName(ctx.supabase, ctx.projectId, libraryName);
-  if (!library) {
-    return {
-      success: false,
-      error: `Library "${libraryName}" not found. Available libraries: ${available.join(', ') || '(none)'}`,
-    };
+  const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
+  if (!libraryResult.ok) {
+    return { success: false, error: libraryResult.error };
   }
+  const library = libraryResult.library;
 
   const properties = await getLibraryProperties(ctx.supabase, library.id);
 

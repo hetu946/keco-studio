@@ -32,6 +32,7 @@ import {
   type ReferenceCellUpdate,
 } from '@/lib/services/referenceSyncService';
 import { computeFormulaValuesForRow } from '@/lib/utils/formula';
+import { compareAssetsForUiRow } from '@/lib/utils/assetEmptiness';
 
 interface LibraryDataContextValue {
   // Data access
@@ -1074,25 +1075,9 @@ export function LibraryDataProvider({ children, libraryId, projectId }: LibraryD
     presenceTracking.updateActiveCell(assetId, fieldId);
   }, [presenceTracking]);
 
-  // Convert Map to ordered array (sort by rowIndex then id for deterministic order across clients)
+  // Convert Map to ordered array (sort by rowIndex then created_at/id — matches table row numbers)
   const allAssets = useMemo(() => {
-    return Array.from(assets.values()).sort((a, b) => {
-      // Prefer explicit rowIndex when available
-      if (typeof a.rowIndex === 'number' && typeof b.rowIndex === 'number') {
-        if (a.rowIndex !== b.rowIndex) return a.rowIndex - b.rowIndex;
-      } else if (typeof a.rowIndex === 'number') {
-        return -1;
-      } else if (typeof b.rowIndex === 'number') {
-        return 1;
-      }
-
-      // Fallback: created_at + id to keep previous behavior for older data
-      if (!a.created_at && !b.created_at) return a.id.localeCompare(b.id);
-      if (!a.created_at) return 1;
-      if (!b.created_at) return -1;
-      const timeDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
-    });
+    return Array.from(assets.values()).sort(compareAssetsForUiRow);
   }, [assets]);
 
   // Cleanup

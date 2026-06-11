@@ -4,24 +4,43 @@
 
 import { z } from 'zod';
 import { updateAsset as updateAssetService } from '@/lib/services/libraryAssetsService';
+import {
+  resolveAgentReferencePropertyValues,
+  validateReferencePropertyValues,
+} from '../asset-emptiness';
+import { resolveAssetByRowIndex } from '../data-access';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
 import { resolvePropertyValues } from '../field-resolver';
-import { findLibraryByName } from './_shared';
+import { getLibraryProperties, resolveLibraryForTool } from './_shared';
 
-const ParamsSchema = z.object({
-  libraryName: z.string().min(1).optional(),
-  assetId: z.string().min(1),
-  name: z.string().optional(),
-  propertyValues: z.record(z.unknown()).optional(),
-});
+const ParamsSchema = z
+  .object({
+    libraryName: z.string().min(1).optional(),
+    assetId: z.string().min(1).optional(),
+    rowIndex: z.number().int().positive().optional(),
+    name: z.string().optional(),
+    propertyValues: z.record(z.unknown()).optional(),
+  })
+  .refine((data) => Boolean(data.assetId || data.rowIndex), {
+    message: 'Either assetId or rowIndex is required.',
+  });
 
 async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
+  try {
+    return await executeUpdateAsset(params, ctx);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to update asset.';
+    return { success: false, error: message };
+  }
+}
+
+async function executeUpdateAsset(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   const parsed = ParamsSchema.safeParse(params);
   if (!parsed.success) {
     return { success: false, error: `Invalid parameters: ${parsed.error.message}` };
   }
   const libraryName = parsed.data.libraryName ?? ctx.currentLibraryName;
-  const { assetId, name, propertyValues } = parsed.data;
+  const { assetId: assetIdParam, rowIndex, name, propertyValues } = parsed.data;
   if (!libraryName) {
     return {
       success: false,
@@ -29,33 +48,49 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
-  const { library, available } = await findLibraryByName(ctx.supabase, ctx.projectId, libraryName);
-  if (!library) {
-    return {
-      success: false,
-      error: `Library "${libraryName}" not found. Available libraries: ${available.join(', ') || '(none)'}`,
-    };
+  const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
+  if (!libraryResult.ok) {
+    return { success: false, error: libraryResult.error };
+  }
+  const library = libraryResult.library;
+
+  let assetId = assetIdParam;
+  let assetRow: { id: string; name: string; library_id?: string } | null = null;
+
+  if (rowIndex !== undefined) {
+    const resolved = await resolveAssetByRowIndex(ctx.supabase, library.id, rowIndex);
+    if (!resolved) {
+      return {
+        success: false,
+        error: `No asset found at row ${rowIndex} in library "${library.name}".`,
+      };
+    }
+    assetId = resolved.id;
+    assetRow = { id: resolved.id, name: resolved.name, library_id: library.id };
+  } else if (assetId) {
+    const { data, error: assetErr } = await ctx.supabase
+      .from('library_assets')
+      .select('id, name, library_id')
+      .eq('id', assetId)
+      .single();
+    if (assetErr || !data) {
+      return { success: false, error: `Asset "${assetId}" not found.` };
+    }
+    assetRow = data;
   }
 
-  // Load the existing asset to preserve its name when not changing it, and to
-  // validate the asset actually belongs to the resolved library.
-  const { data: assetRow, error: assetErr } = await ctx.supabase
-    .from('library_assets')
-    .select('id, name, library_id')
-    .eq('id', assetId)
-    .single();
-  if (assetErr || !assetRow) {
-    return { success: false, error: `Asset "${assetId}" not found.` };
+  if (!assetId || !assetRow) {
+    return { success: false, error: 'Either assetId or rowIndex is required.' };
   }
-  if (assetRow.library_id !== library.id) {
+
+  if (assetRow.library_id && assetRow.library_id !== library.id) {
     return { success: false, error: `Asset "${assetId}" does not belong to library "${library.name}".` };
   }
 
-  const { resolved, unresolved, availableFields } = await resolvePropertyValues(
-    ctx.supabase,
-    library.id,
-    propertyValues
-  );
+  const [properties, { resolved, unresolved, availableFields }] = await Promise.all([
+    getLibraryProperties(ctx.supabase, library.id),
+    resolvePropertyValues(ctx.supabase, library.id, propertyValues),
+  ]);
   if (unresolved.length > 0) {
     return {
       success: false,
@@ -63,12 +98,38 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
+  let resolvedWithReferences: Record<string, unknown>;
   try {
-    await updateAssetService(ctx.supabase, assetId, name ?? assetRow.name, resolved);
+    resolvedWithReferences = await resolveAgentReferencePropertyValues(
+      ctx.supabase,
+      properties,
+      resolved
+    );
+  } catch (e) {
+    return { success: false, error: (e as Error).message || 'Failed to resolve reference values.' };
+  }
+
+  const referenceValidation = await validateReferencePropertyValues(
+    ctx.supabase,
+    properties,
+    resolvedWithReferences
+  );
+  if (!referenceValidation.ok) {
+    return { success: false, error: referenceValidation.error };
+  }
+
+  try {
+    await updateAssetService(ctx.supabase, assetId, name ?? assetRow.name, resolvedWithReferences);
     return {
       success: true,
       displayHint: 'text',
-      data: { assetId, libraryId: library.id, libraryName: library.name, name: name ?? assetRow.name },
+      data: {
+        assetId,
+        rowIndex: rowIndex ?? null,
+        libraryId: library.id,
+        libraryName: library.name,
+        name: name ?? assetRow.name,
+      },
       invalidateCache: [library.id],
     };
   } catch (e) {
@@ -79,7 +140,7 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
 export const updateAsset: AgentTool = {
   name: 'update_asset',
   description:
-    'Modify fields of an existing asset. Use semantic field names in propertyValues. libraryName defaults to the active library from page context when omitted. Params: assetId (required), libraryName (optional), name (optional), propertyValues.',
+    'Modify fields of an existing asset. Prefer rowIndex when the user names a table row (e.g. "write to row 1" → rowIndex=1). Reference fields: pass referenceTargets from query_assets (assetId+fieldId per cell). Params: libraryName, rowIndex OR assetId, propertyValues.',
   category: 'write',
   confirmationMode: 'pre_execute',
   requiredPermission: 'editor',
@@ -88,9 +149,14 @@ export const updateAsset: AgentTool = {
     properties: {
       libraryName: {
         type: 'string',
-        description: 'Name of the library the asset belongs to. Omit to use the active library from page context.',
+        description: 'Library containing the row to update. Omit to use the active library.',
       },
-      assetId: { type: 'string', description: 'UUID of the asset to update' },
+      rowIndex: {
+        type: 'number',
+        description:
+          'UI row number to update (1 = first row). Use this when the user says "第一行" / "row 1". Preferred over assetId for row targeting.',
+      },
+      assetId: { type: 'string', description: 'UUID of the asset to update. Omit when rowIndex is provided.' },
       name: { type: 'string', description: 'New asset name (optional)' },
       propertyValues: {
         type: 'object',
@@ -98,7 +164,7 @@ export const updateAsset: AgentTool = {
         additionalProperties: true,
       },
     },
-    required: ['assetId'],
+    required: [],
   },
   execute,
 };

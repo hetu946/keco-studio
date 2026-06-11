@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { MessageOutlined } from '@ant-design/icons';
 import { useNavigation } from '@/lib/contexts/NavigationContext';
 import { getActiveSectionName } from '@/lib/agent/page-context';
 import { useAgentChat } from './useAgentChat';
@@ -90,7 +91,7 @@ export function ChatPanel() {
   if (!open) {
     return (
       <button className={styles.launcher} title="Keco Assistant" onClick={() => setOpen(true)}>
-        AI
+        <MessageOutlined className={styles.launcherIcon} />
       </button>
     );
   }

@@ -5,6 +5,7 @@ import type { ChatItem } from './types';
 import { ToolCallCard } from './ToolCallCard';
 import { ConfirmationCard } from './ConfirmationCard';
 import { ScriptPreviewCard } from './ScriptPreviewCard';
+import { SetupLibraryPreviewCard } from './SetupLibraryPreviewCard';
 
 interface Props {
   item: ChatItem;
@@ -25,6 +26,16 @@ export function ChatMessage({ item, streaming, onDecision }: Props) {
     case 'confirmation': {
       if (!item.confirmation) return null;
       if (item.confirmation.confirmationMode === 'post_preview') {
+        const preview = item.confirmation.preview as { type?: string } | undefined;
+        if (preview?.type === 'setup_library') {
+          return (
+            <SetupLibraryPreviewCard
+              confirmation={item.confirmation}
+              disabled={streaming}
+              onDecision={onDecision}
+            />
+          );
+        }
         return <ScriptPreviewCard confirmation={item.confirmation} disabled={streaming} onDecision={onDecision} />;
       }
       return <ConfirmationCard confirmation={item.confirmation} disabled={streaming} onDecision={onDecision} />;

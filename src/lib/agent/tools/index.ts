@@ -9,9 +9,16 @@ import { queryScriptLines } from './query-script-lines';
 import { addField } from './add-field';
 import { createAsset } from './create-asset';
 import { updateAsset } from './update-asset';
+import { updateRow } from './update-row';
+import { setReference } from './set-reference';
 import { deleteAsset } from './delete-asset';
 import { importScript } from './import-script';
 import { setConversationOption } from './set-conversation-option';
+import { createLibrary } from './create-library';
+import { createFolder } from './create-folder';
+import { deleteLibrary } from './delete-library';
+import { renameLibrary } from './rename-library';
+import { setupLibrary } from './setup-library';
 
 export const allTools: AgentTool[] = [
   queryAssets,
@@ -19,9 +26,16 @@ export const allTools: AgentTool[] = [
   addField,
   createAsset,
   updateAsset,
+  updateRow,
+  setReference,
   deleteAsset,
   importScript,
   setConversationOption,
+  createLibrary,
+  createFolder,
+  deleteLibrary,
+  renameLibrary,
+  setupLibrary,
 ];
 
 export function getToolsForLlm(): OpenAITool[] {

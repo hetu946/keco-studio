@@ -19,7 +19,7 @@ export type UserRole = 'admin' | 'editor' | 'viewer';
  */
 export type ConfirmationMode = 'pre_execute' | 'post_preview' | 'meta';
 
-export type DisplayHint = 'table' | 'text' | 'list' | 'script_preview';
+export type DisplayHint = 'table' | 'text' | 'list' | 'script_preview' | 'skill_preview';
 
 /** Loose JSON Schema type — we only forward this to the LLM verbatim. */
 export type JSONSchema = Record<string, unknown>;
