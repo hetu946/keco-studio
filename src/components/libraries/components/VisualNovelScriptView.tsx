@@ -16,106 +16,194 @@ interface VisualNovelScriptViewProps {
   scriptColumns: ScriptColumns;
 }
 
+/* ───────── helpers ───────── */
+
+/** Resolve speaker name from Name column value. Non-numeric text is used directly (e.g. 崔, 魏). */
 function resolveSpeakerName(nameValue: string | undefined | null): string {
   if (!nameValue) return 'Narrator';
   const v = String(nameValue).trim();
   if (v === '1') return 'Assistant';
   if (v === '2') return 'Altana';
-  // If the name is a non-empty string that's not a numeric code, use it directly (e.g. Chinese names)
   if (v && !/^\d+$/.test(v)) return v;
   return 'Narrator';
 }
 
-function resolveDialogType(typeValue: string | number | undefined | null): string | null {
+function resolveDialogType(typeValue: string | number | undefined | null): '1' | '2' | '3' | '4' | '5' | null {
   if (typeValue === undefined || typeValue === null) return null;
   const v = String(typeValue).trim();
-  if (v === '1' || v === '2' || v === '3') return v;
+  if (v === '1' || v === '2' || v === '3' || v === '4' || v === '5') return v;
   return null;
 }
 
-/**
- * Build a speaker-to-side map: each unique speaker is assigned 'left' or 'right'
- * based on order of first appearance (1st→left, 2nd→right, 3rd→left, ...).
- * The same speaker always stays on the same side.
- */
-function buildSpeakerAlignmentMap(
-  rows: AssetRow[],
-  typeKey: string | undefined,
-  nameKey: string | undefined,
-): Map<string, 'left' | 'right'> {
-  const map = new Map<string, 'left' | 'right'>();
-  let side: 'left' | 'right' = 'left';
-
-  for (const row of rows) {
-    const typeVal = typeKey ? row.propertyValues[typeKey] : undefined;
-    if (resolveDialogType(typeVal)) continue; // has explicit type, skip
-
-    const nameVal = nameKey ? row.propertyValues[nameKey] : undefined;
-    const speakerName = resolveSpeakerName(nameVal);
-    if (!speakerName || speakerName === 'Narrator') continue;
-
-    if (!map.has(speakerName)) {
-      map.set(speakerName, side);
-      side = side === 'left' ? 'right' : 'left';
-    }
-  }
-  return map;
+/** Type 4 or Name 4: plain text without dialog bubble, always left. */
+function isNoDialogBox(
+  typeValue: string | number | undefined | null,
+  nameValue: string | undefined | null,
+): boolean {
+  if (resolveDialogType(typeValue) === '4') return true;
+  return String(nameValue ?? '').trim() === '4';
 }
 
-/**
- * Determine dialog alignment from Type field, or fallback to speaker map.
- */
-function getDialogAlignment(
-  typeValue: string | number | undefined | null,
-  speakerName: string,
-  speakerMap: Map<string, 'left' | 'right'>,
-): 'left' | 'right' {
-  const type = resolveDialogType(typeValue);
-  if (type === '1') return 'left';
-  if (type === '2') return 'right';
-  if (type === '3') return 'left';
+/** Type 5: centered fullscreen text. */
+function isFullscreenType(typeValue: string | number | undefined | null): boolean {
+  return resolveDialogType(typeValue) === '5';
+}
 
-  // Fallback: use speaker map (same speaker always on same side)
-  return speakerMap.get(speakerName) ?? 'left';
+/** Branch / scene labels that begin a new Part. */
+function isPartLabel(label: string): boolean {
+  const l = label.trim();
+  if (!l || l === '*') return false;
+  if (l.toLowerCase() === 'start') return true;
+  if (/^O\d+$/i.test(l)) return true;
+  if (l.toLowerCase() === 'oend') return true;
+  return false;
+}
+
+function resetDialogTurn(state: {
+  lastSpeaker: string | null;
+  lastSide: 'left' | 'right';
+  activePartLabel: string | null;
+}) {
+  state.lastSpeaker = null;
+  state.lastSide = 'left';
+}
+
+function computeDialogAlignments(
+  rows: AssetRow[],
+  nameKey: string | undefined,
+  typeKey: string | undefined,
+  contentKey: string | undefined,
+  labelKey: string | undefined,
+): Map<string, 'left' | 'right'> {
+  const alignments = new Map<string, 'left' | 'right'>();
+  const state = {
+    lastSpeaker: null as string | null,
+    lastSide: 'left' as 'left' | 'right',
+    activePartLabel: null as string | null,
+  };
+
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    const labelVal = labelKey ? row.propertyValues[labelKey] : undefined;
+    const typeVal = typeKey ? row.propertyValues[typeKey] : undefined;
+    const nameVal = nameKey ? row.propertyValues[nameKey] : undefined;
+    const contentVal = contentKey ? row.propertyValues[contentKey] : undefined;
+
+    const label = String(labelVal ?? '').trim();
+    const content = String(contentVal ?? '').trim();
+    const prevLabel = index > 0
+      ? String(rows[index - 1].propertyValues[labelKey ?? ''] ?? '').trim()
+      : '';
+
+    if (label === '*') {
+      state.activePartLabel = null;
+      resetDialogTurn(state);
+      continue;
+    }
+
+    if (label.toLowerCase() === 'start') {
+      if (state.activePartLabel !== 'start') {
+        state.activePartLabel = 'start';
+        resetDialogTurn(state);
+      }
+      continue;
+    }
+
+    if (prevLabel === '*' && label) {
+      state.activePartLabel = label;
+      resetDialogTurn(state);
+    } else if (label && !content) {
+      state.activePartLabel = label;
+      resetDialogTurn(state);
+      continue;
+    } else if (isPartLabel(label) && label !== state.activePartLabel) {
+      state.activePartLabel = label;
+      resetDialogTurn(state);
+    }
+
+    if (!content) continue;
+
+    const type = resolveDialogType(typeVal);
+
+    if (type === '3') {
+      alignments.set(row.id, 'left');
+      continue;
+    }
+
+    if (type === '5' || isNoDialogBox(typeVal, nameVal)) {
+      if (isNoDialogBox(typeVal, nameVal)) {
+        alignments.set(row.id, 'left');
+      }
+      continue;
+    }
+
+    const speakerName = resolveSpeakerName(nameVal);
+
+    let side: 'left' | 'right';
+    if (state.lastSpeaker === null) {
+      side = type === '2' ? 'right' : 'left';
+    } else if (state.lastSpeaker === speakerName) {
+      side = state.lastSide;
+    } else {
+      side = state.lastSide === 'left' ? 'right' : 'left';
+    }
+
+    alignments.set(row.id, side);
+    state.lastSpeaker = speakerName;
+    state.lastSide = side;
+  }
+
+  return alignments;
+}
+
+function getDialogColorClass(
+  typeValue: string | number | undefined | null,
+  alignment: 'left' | 'right',
+): 'blue' | 'pink' | 'gray' {
+  if (resolveDialogType(typeValue) === '3') return 'gray';
+  return alignment === 'right' ? 'pink' : 'blue';
 }
 
 function getAvatarLetter(speakerName: string): string {
   if (speakerName === 'Altana') return 'A';
   if (speakerName === 'Assistant') return 'A';
-  return 'N';
+  return speakerName.charAt(0) || 'N';
 }
 
-function getAvatarColor(speakerName: string, alignment: 'left' | 'right'): 'blue' | 'pink' {
-  if (speakerName === 'Altana') return 'pink';
-  return alignment === 'right' ? 'pink' : 'blue';
+function renderPartTitle(rowId: string, label: string) {
+  return (
+    <div key={rowId} className={styles.partHeaderWrap}>
+      <div className={styles.partHeaderRow}>
+        <div className={styles.partHeaderLine} aria-hidden />
+        <div className={styles.partTitleOval}>
+          <span className={styles.sceneMarkerText}>{label}</span>
+        </div>
+        <div className={styles.partHeaderLine} aria-hidden />
+      </div>
+    </div>
+  );
 }
 
-function getDialogColorClass(typeValue: string | number | undefined | null): 'blue' | 'pink' | 'gray' {
-  const type = resolveDialogType(typeValue);
-  if (type === '2') return 'pink';
-  if (type === '3') return 'gray';
-  return 'blue';
-}
+/* ───────── component ───────── */
 
 export function VisualNovelScriptView({ rows, scriptColumns }: VisualNovelScriptViewProps) {
   const { labelKey, typeKey, nameKey, contentKey } = scriptColumns;
 
-  // Filter rows: start from the row where Label contains "Start" (case-insensitive)
+  // Step 1: filter rows — start from Label = "Start" (case-insensitive)
   const filteredRows = useMemo(() => {
     if (!labelKey) return rows;
     const startIndex = rows.findIndex((row) => {
       const labelVal = row.propertyValues[labelKey];
-      if (!labelVal) return false;
-      return String(labelVal).trim().toLowerCase().includes('start');
+      return String(labelVal ?? '').trim().toLowerCase() === 'start';
     });
-    if (startIndex === -1) return rows; // no "Start" found, show all
+    if (startIndex === -1) return rows; // no "Start" found → show all
     return rows.slice(startIndex);
   }, [rows, labelKey]);
 
-  // Build speaker-to-side alignment map for fallback (when Type is not 1/2/3)
-  const speakerAlignmentMap = useMemo(
-    () => buildSpeakerAlignmentMap(filteredRows, typeKey, nameKey),
-    [filteredRows, typeKey, nameKey],
+  // Step 2: build speaker → side map from filtered rows
+  const dialogAlignments = useMemo(
+    () => computeDialogAlignments(filteredRows, nameKey, typeKey, contentKey, labelKey),
+    [filteredRows, nameKey, typeKey, contentKey, labelKey],
   );
 
   if (!filteredRows.length) {
@@ -124,7 +212,7 @@ export function VisualNovelScriptView({ rows, scriptColumns }: VisualNovelScript
 
   return (
     <div className={styles.container}>
-      {filteredRows.map((row) => {
+      {filteredRows.map((row, index) => {
         const labelVal = labelKey ? row.propertyValues[labelKey] : undefined;
         const typeVal = typeKey ? row.propertyValues[typeKey] : undefined;
         const nameVal = nameKey ? row.propertyValues[nameKey] : undefined;
@@ -133,47 +221,101 @@ export function VisualNovelScriptView({ rows, scriptColumns }: VisualNovelScript
         const content = String(contentVal ?? '').trim();
         const label = String(labelVal ?? '').trim();
 
-        // Render scene marker
-        if (label && !content) {
+        // "Start" → centered title
+        if (label.toLowerCase() === 'start') {
+          return renderPartTitle(row.id, label);
+        }
+
+        // Label="*" → section separator, render nothing
+        if (label === '*') return null;
+
+        // Chapter title after "*" (e.g. O1, O2) → centered
+        const prevLabel = index > 0
+          ? String(filteredRows[index - 1].propertyValues[labelKey ?? ''] ?? '').trim()
+          : '';
+        const isChapterTitle = prevLabel === '*' && label;
+
+        if (isChapterTitle) {
+          if (!content) {
+            return renderPartTitle(row.id, label);
+          }
           return (
-            <div key={row.id} className={styles.sceneMarker}>
-              <span className={styles.sceneMarkerText}>{label}</span>
-            </div>
+            <React.Fragment key={row.id}>
+              {renderPartTitle(`${row.id}-title`, label)}
+              {renderScriptLine(row.id, typeVal, nameVal, content, dialogAlignments)}
+            </React.Fragment>
           );
         }
 
-        // Skip rows with no content and no label
+        if (label && !content) {
+          return renderPartTitle(row.id, label);
+        }
+
         if (!content && !label) return null;
 
-        const speakerName = resolveSpeakerName(nameVal);
-        const alignment = getDialogAlignment(typeVal, speakerName, speakerAlignmentMap);
-        const avatarColor = getAvatarColor(speakerName, alignment);
-        const avatarLetter = getAvatarLetter(speakerName);
-        const dialogColor = getDialogColorClass(typeVal);
-
-        // Determine dialog type tag label
-        const typeTag = dialogColor === 'pink' ? 'PINK DIALOG' : dialogColor === 'gray' ? 'NARRATOR' : 'BLUE DIALOG';
-        const tagColorClass = dialogColor === 'pink' ? 'pink' : dialogColor === 'gray' ? 'gray' : 'blue';
-
-        return (
-          <div key={row.id} className={`${styles.dialogRow} ${alignment === 'right' ? styles.right : styles.left}`}>
-            <div>
-              <div className={styles.speakerHeader}>
-                <div className={`${styles.avatar} ${styles[avatarColor]}`}>
-                  {avatarLetter}
-                </div>
-                <span className={styles.speakerName}>{speakerName}</span>
-                <span className={`${styles.dialogTag} ${styles[tagColorClass]}`}>
-                  {typeTag}
-                </span>
-              </div>
-              <div className={`${styles.dialogBubble} ${styles[dialogColor]}`}>
-                {content}
-              </div>
-            </div>
-          </div>
-        );
+        return renderScriptLine(row.id, typeVal, nameVal, content, dialogAlignments);
       })}
+    </div>
+  );
+}
+
+function renderScriptLine(
+  rowId: string,
+  typeVal: string | number | undefined | null,
+  nameVal: string | undefined | null,
+  content: string,
+  alignments: Map<string, 'left' | 'right'>,
+) {
+  if (isFullscreenType(typeVal)) {
+    return renderFullscreenText(rowId, content);
+  }
+  if (isNoDialogBox(typeVal, nameVal)) {
+    return renderPlainText(rowId, content);
+  }
+  return renderDialog(rowId, typeVal, nameVal, content, alignments);
+}
+
+function renderFullscreenText(rowId: string, content: string) {
+  return (
+    <div key={rowId} className={styles.fullscreenRow}>
+      <p className={styles.fullscreenText}>{content}</p>
+    </div>
+  );
+}
+
+function renderPlainText(rowId: string, content: string) {
+  return (
+    <div key={rowId} className={`${styles.plainTextRow} ${styles.left}`}>
+      <p className={styles.plainText}>{content}</p>
+    </div>
+  );
+}
+
+function renderDialog(
+  rowId: string,
+  typeVal: string | number | undefined | null,
+  nameVal: string | undefined | null,
+  content: string,
+  alignments: Map<string, 'left' | 'right'>,
+) {
+  const speakerName = resolveSpeakerName(nameVal);
+  const alignment = alignments.get(rowId) ?? 'left';
+  const dialogColor = getDialogColorClass(typeVal, alignment);
+  const avatarLetter = getAvatarLetter(speakerName);
+
+  return (
+    <div key={rowId} className={`${styles.dialogRow} ${alignment === 'right' ? styles.right : styles.left}`}>
+      <div>
+        <div className={styles.speakerHeader}>
+          <div className={`${styles.avatar} ${styles[dialogColor]}`}>
+            {avatarLetter}
+          </div>
+          <span className={styles.speakerName}>{speakerName}</span>
+        </div>
+        <div className={`${styles.dialogBubble} ${styles[dialogColor]}`}>
+          {content}
+        </div>
+      </div>
     </div>
   );
 }

@@ -114,6 +114,58 @@
   border-top-right-radius: 0.5rem;
 }
 
+/* View toggle: Table / Script buttons */
+.viewToggleGroup {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  align-self: stretch;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.viewToggleBtn {
+  font-family: 'Roboto', sans-serif;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #7D7D7D;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.viewToggleBtn:hover {
+  color: #475569;
+}
+
+.viewToggleBtnActive {
+  color: #0B99FF;
+}
+
+.viewToggleBtnActive::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0;
+  height: 2px;
+  background: #0B99FF;
+  border-radius: 1px 1px 0 0;
+}
+
+.scriptViewContainer {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 200px);
+  min-height: 400px;
+}
+
 .tableContainer {
   overflow-x: auto;
   overflow-y: hidden;
@@ -514,17 +566,11 @@
   align-items: center;
   justify-content: center;
   background-color: transparent;
-  opacity: 0;
-  transition: opacity 0.15s ease, background-color 0.15s ease;
+  cursor: pointer;
 }
 
 .propertyHeaderIcon {
   flex-shrink: 0;
-  opacity: 1;
-}
-
-.propertyHeaderContent:hover .propertyHeaderIconWrapper {
-  background-color: rgba(11, 153, 255, 0.08);
   opacity: 1;
 }
 
