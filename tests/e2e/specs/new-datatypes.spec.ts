@@ -9,7 +9,8 @@ import { generateLibraryData } from '../fixures/libraries';
 async function login(page: Page): Promise<void> {
   const loginPage = new LoginPage(page);
   await loginPage.goto();
-  await loginPage.login(users.seedEmpty);
+  // Dedicated empty seed account — avoids CI shard contention on seed-empty.
+  await loginPage.login(users.seedEmpty3);
   await loginPage.expectLoginSuccess();
 }
 

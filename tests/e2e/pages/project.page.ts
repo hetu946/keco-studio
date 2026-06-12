@@ -172,33 +172,55 @@ export class ProjectPage {
   }
 
   /**
-   * Open an existing project by name
-   * @param projectName - Name of the project to open
+   * Open an existing project by name.
+   * Polls the sidebar until the project row appears (list refresh can lag in CI).
    */
-  async openProject(projectName: string): Promise<void> {
-    // Find and click the project by its name
-    // Use title attribute for reliable matching (handles truncated names in sidebar)
+  async openProject(projectName: string, timeoutMs?: number): Promise<void> {
+    const timeout = timeoutMs ?? (process.env.CI === 'true' ? 45000 : 20000);
     const sidebar = this.page.locator('aside');
-    const projectByTitle = sidebar.locator(`[title="${projectName}"]`);
-    const titleExists = await projectByTitle.count() > 0;
-    
-    let projectCard;
-    if (titleExists) {
-      // Found in sidebar by title attribute
-      projectCard = projectByTitle.first();
-    } else {
-      // Try other strategies (for project cards in main content area)
-      projectCard = this.page.getByRole('button', { name: projectName })
-        .or(this.page.getByRole('link', { name: projectName }))
-        .or(this.page.getByText(projectName).first());
+    const projectByTitle = sidebar.locator(`[title="${projectName}"]`).first();
+
+    // Ensure projects list is reachable when creation bounced back to /projects.
+    if (!this.isProjectDetailPath(new URL(this.page.url()).pathname)) {
+      await this.page.goto('/projects', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     }
 
-    // Increased timeout for remote/CI environments
-    await expect(projectCard).toBeVisible({ timeout: 15000 });
-    await projectCard.click();
+    let foundInSidebar = false;
+    try {
+      await expect
+        .poll(
+          async () => {
+            if ((await projectByTitle.count()) === 0) return false;
+            await projectByTitle.scrollIntoViewIfNeeded().catch(() => {});
+            return projectByTitle.isVisible().catch(() => false);
+          },
+          { timeout, intervals: [500, 1000, 2000] }
+        )
+        .toBe(true);
+      foundInSidebar = true;
+    } catch {
+      foundInSidebar = false;
+    }
 
-    // Wait for navigation to project detail page
-    await this.page.waitForLoadState('load', { timeout: 15000 });
+    if (foundInSidebar) {
+      await projectByTitle.click();
+    } else {
+      const projectCard = this.page
+        .getByRole('button', { name: projectName })
+        .or(this.page.getByRole('link', { name: projectName }))
+        .or(this.page.getByText(projectName, { exact: true }).first());
+      await expect(projectCard).toBeVisible({ timeout: Math.min(timeout, 15000) });
+      await projectCard.click();
+    }
+
+    await expect
+      .poll(() => this.isProjectDetailPath(new URL(this.page.url()).pathname), {
+        timeout,
+        intervals: [300, 500, 1000],
+      })
+      .toBe(true);
+
+    await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
   }
 
   /**
@@ -246,7 +268,7 @@ export class ProjectPage {
       if (!projectName) {
         throw new Error('Project creation did not navigate away from /projects');
       }
-      await this.openProject(projectName);
+      await this.openProject(projectName, remainingMs());
     }
 
     await expect
@@ -262,7 +284,7 @@ export class ProjectPage {
 
     // Project page may briefly redirect back to /projects while data settles; re-open if needed.
     if (!this.isProjectDetailPath(new URL(this.page.url()).pathname) && projectName) {
-      await this.openProject(projectName);
+      await this.openProject(projectName, remainingMs());
       await expect
         .poll(() => this.isProjectDetailPath(new URL(this.page.url()).pathname), {
           timeout: remainingMs(),
