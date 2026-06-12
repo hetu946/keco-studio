@@ -248,7 +248,7 @@ export async function getLibraryAssets(
   await verifyLibraryAccess(supabase, libraryId);
 
   const assets = await fetchAllPaged<{ id: string; library_id: string; name: string; created_at: string; row_index: number | null }>(
-    (from, to) =>
+    async (from, to) =>
       supabase
         .from('library_assets')
         .select('id, library_id, name, created_at, row_index')
@@ -262,7 +262,7 @@ export async function getLibraryAssets(
 
   const assetIds = assets.map((a) => a.id);
   const valueData = await fetchAllPaged<{ asset_id: string; field_id: string; value_json: unknown }>(
-    (from, to) =>
+    async (from, to) =>
       supabase
         .from('library_asset_values')
         .select('asset_id, field_id, value_json')

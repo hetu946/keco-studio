@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { addLibraryField } from '@/lib/services/libraryAssetsService';
 import { normalizeFieldDataType, SUPPORTED_FIELD_DATA_TYPES } from '../field-data-type';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { resolveLibraryForTool } from './_shared';
+import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -50,10 +50,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   }
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   // Resolve reference library names → UUIDs (DB column is uuid[]).
   let resolvedReferenceLibraryIds: string[] | undefined;
@@ -61,10 +62,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     resolvedReferenceLibraryIds = [];
     for (const refName of parsed.data.referenceLibraries) {
       const refResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, refName, ctx);
-      if (!refResult.ok) {
-        return { success: false, error: refResult.error };
+      const refLookupError = errorFromLookupResult(refResult);
+      if (refLookupError !== undefined) {
+        return { success: false, error: refLookupError };
       }
-      resolvedReferenceLibraryIds.push(refResult.library.id);
+      resolvedReferenceLibraryIds.push(libraryFromLookupResult(refResult).id);
     }
   }
 

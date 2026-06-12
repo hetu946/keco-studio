@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { deleteAsset as deleteAssetService } from '@/lib/services/libraryAssetsService';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { resolveLibraryForTool } from './_shared';
+import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -27,10 +27,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   }
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   const { data: assetRow, error: assetErr } = await ctx.supabase
     .from('library_assets')

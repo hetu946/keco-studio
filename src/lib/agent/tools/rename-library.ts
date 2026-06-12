@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { listProjectLibraries, renameLibraryServer } from '../data-access';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { resolveLibraryForTool } from './_shared';
+import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1),
@@ -22,10 +22,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   const { libraryName, newName } = parsed.data;
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   try {
     const existing = await listProjectLibraries(ctx.supabase, ctx.projectId);

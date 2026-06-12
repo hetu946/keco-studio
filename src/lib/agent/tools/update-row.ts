@@ -22,7 +22,12 @@ import {
 import { buildFieldLabelMap, getLibraryAssets, getLibraryProperties } from '../data-access';
 import { resolvePropertyValues } from '../field-resolver';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { resolveLibraryForTool } from './_shared';
+import {
+  errorFromLookupResult,
+  errorFromOkResult,
+  libraryFromLookupResult,
+  resolveLibraryForTool,
+} from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -67,10 +72,11 @@ async function executeUpdateRow(params: unknown, ctx: ToolContext): Promise<Tool
   }
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   const assets = await getLibraryAssets(ctx.supabase, library.id);
   const sorted = sortAssetsForUiRow(assets);
@@ -105,8 +111,9 @@ async function executeUpdateRow(params: unknown, ctx: ToolContext): Promise<Tool
     properties,
     resolvedWithReferences
   );
-  if (!referenceValidation.ok) {
-    return { success: false, error: referenceValidation.error };
+  const referenceError = errorFromOkResult(referenceValidation);
+  if (referenceError !== undefined) {
+    return { success: false, error: referenceError };
   }
 
   const labelByFieldId = buildFieldLabelMap(properties);

@@ -11,7 +11,13 @@ import {
 import { resolveAssetByRowIndex } from '../data-access';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
 import { resolvePropertyValues } from '../field-resolver';
-import { getLibraryProperties, resolveLibraryForTool } from './_shared';
+import {
+  errorFromLookupResult,
+  errorFromOkResult,
+  getLibraryProperties,
+  libraryFromLookupResult,
+  resolveLibraryForTool,
+} from './_shared';
 
 const ParamsSchema = z
   .object({
@@ -49,10 +55,11 @@ async function executeUpdateAsset(params: unknown, ctx: ToolContext): Promise<To
   }
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   let assetId = assetIdParam;
   let assetRow: { id: string; name: string; library_id?: string } | null = null;
@@ -114,8 +121,9 @@ async function executeUpdateAsset(params: unknown, ctx: ToolContext): Promise<To
     properties,
     resolvedWithReferences
   );
-  if (!referenceValidation.ok) {
-    return { success: false, error: referenceValidation.error };
+  const referenceError = errorFromOkResult(referenceValidation);
+  if (referenceError !== undefined) {
+    return { success: false, error: referenceError };
   }
 
   try {

@@ -9,7 +9,12 @@ import { z } from 'zod';
 import { getLibraryAssets } from '../data-access';
 import { SCRIPT_COLUMNS } from '@/lib/script-parser';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { getLibraryProperties, resolveLibraryForTool } from './_shared';
+import {
+  errorFromLookupResult,
+  getLibraryProperties,
+  libraryFromLookupResult,
+  resolveLibraryForTool,
+} from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -31,10 +36,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   }
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   const properties = await getLibraryProperties(ctx.supabase, library.id);
 

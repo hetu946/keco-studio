@@ -5,6 +5,8 @@
  * The library_assets.name field (often "Untitled") is not part of this determination.
  */
 
+import type { AssetRow } from '@/lib/types/libraryAssets';
+
 /** Normalize a cell value to a display string; empty when null/blank. */
 export function cellDisplayString(raw: unknown): string {
   if (raw === null || raw === undefined) return '';

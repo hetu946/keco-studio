@@ -23,7 +23,7 @@ import type { PropertyConfig } from '@/lib/types/libraryAssets';
 import { buildLibraryReferenceSelections } from '../asset-emptiness';
 import { getLibraryAssets, getLibraryProperties } from '../data-access';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { resolveLibraryForTool } from './_shared';
+import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from './_shared';
 
 const ParamsSchema = z.object({
   sourceLibrary: z.string().min(1),
@@ -95,16 +95,18 @@ async function executeSetReference(params: unknown, ctx: ToolContext): Promise<T
   }
 
   const sourceResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, sourceLibrary, ctx);
-  if (!sourceResult.ok) {
-    return { success: false, error: `Source library error: ${sourceResult.error}` };
+  const sourceLookupError = errorFromLookupResult(sourceResult);
+  if (sourceLookupError !== undefined) {
+    return { success: false, error: `Source library error: ${sourceLookupError}` };
   }
-  const source = sourceResult.library;
+  const source = libraryFromLookupResult(sourceResult);
 
   const targetResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, targetLibraryName, ctx);
-  if (!targetResult.ok) {
-    return { success: false, error: `Target library error: ${targetResult.error}` };
+  const targetLookupError = errorFromLookupResult(targetResult);
+  if (targetLookupError !== undefined) {
+    return { success: false, error: `Target library error: ${targetLookupError}` };
   }
-  const target = targetResult.library;
+  const target = libraryFromLookupResult(targetResult);
 
   // Build reference selections from every non-empty source cell.
   const [sourceProperties, sourceAssets] = await Promise.all([

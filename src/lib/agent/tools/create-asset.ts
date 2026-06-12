@@ -10,7 +10,13 @@ import {
 } from '../asset-emptiness';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
 import { resolvePropertyValues } from '../field-resolver';
-import { getLibraryProperties, resolveLibraryForTool } from './_shared';
+import {
+  errorFromLookupResult,
+  errorFromOkResult,
+  getLibraryProperties,
+  libraryFromLookupResult,
+  resolveLibraryForTool,
+} from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -33,10 +39,11 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   }
 
   const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
-  if (!libraryResult.ok) {
-    return { success: false, error: libraryResult.error };
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
-  const library = libraryResult.library;
+  const library = libraryFromLookupResult(libraryResult);
 
   const [properties, { resolved, unresolved, availableFields }] = await Promise.all([
     getLibraryProperties(ctx.supabase, library.id),
@@ -65,8 +72,9 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     properties,
     resolvedWithReferences
   );
-  if (!referenceValidation.ok) {
-    return { success: false, error: referenceValidation.error };
+  const referenceError = errorFromOkResult(referenceValidation);
+  if (referenceError !== undefined) {
+    return { success: false, error: referenceError };
   }
 
   try {
