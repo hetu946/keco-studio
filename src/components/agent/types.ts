@@ -28,6 +28,11 @@ export interface ChatItem {
   id: string;
   role: ChatItemRole;
   text?: string;
+  reasoning?: string;
+  /** Wall-clock start of the reasoning stream (first reasoning_delta). */
+  reasoningStartedAt?: number;
+  /** Set when visible answer text begins after reasoning. */
+  reasoningEndedAt?: number;
   toolCall?: ToolCallView;
   confirmation?: ConfirmationView;
   error?: string;

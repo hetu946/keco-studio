@@ -27,6 +27,8 @@ export function useAgentChat(ctx: SendContext) {
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
+  const streamingAssistantIdRef = useRef<string | null>(null);
+  const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(null);
 
   const setConv = (id: string | undefined) => {
     conversationIdRef.current = id;
@@ -83,22 +85,54 @@ export function useAgentChat(ctx: SendContext) {
       let assistantId: string | null = null;
       let toolCallId: string | null = null;
 
+      const ensureAssistantBubble = () => {
+        if (!assistantId) {
+          assistantId = nextId();
+          streamingAssistantIdRef.current = assistantId;
+          setStreamingAssistantId(assistantId);
+          appendItem({ id: assistantId, role: 'assistant' });
+        }
+        return assistantId;
+      };
+
       const handleEvent = (event: ParsedSSE) => {
         switch (event.type) {
+          case 'reasoning_delta': {
+            const delta = String(event.content ?? '');
+            const id = ensureAssistantBubble();
+            const now = Date.now();
+            setItems((prev) =>
+              prev.map((it) => {
+                if (it.id !== id) return it;
+                return {
+                  ...it,
+                  reasoning: (it.reasoning ?? '') + delta,
+                  reasoningStartedAt: it.reasoningStartedAt ?? now,
+                };
+              })
+            );
+            break;
+          }
           case 'text_delta': {
             const delta = String(event.content ?? '');
-            if (!assistantId) {
-              assistantId = nextId();
-              appendItem({ id: assistantId, role: 'assistant', text: delta });
-            } else {
-              setItems((prev) =>
-                prev.map((it) => (it.id === assistantId ? { ...it, text: (it.text ?? '') + delta } : it))
-              );
-            }
+            const id = ensureAssistantBubble();
+            const now = Date.now();
+            setItems((prev) =>
+              prev.map((it) => {
+                if (it.id !== id) return it;
+                const patch: Partial<ChatItem> = { text: (it.text ?? '') + delta };
+                if (it.reasoning && !it.reasoningEndedAt) {
+                  patch.reasoningEndedAt = now;
+                }
+                return { ...it, ...patch };
+              })
+            );
             break;
           }
           case 'tool_call_start': {
             assistantId = null;
+            streamingAssistantIdRef.current = null;
+            setStreamingAssistantId(null);
             toolCallId = nextId();
             appendItem({
               id: toolCallId,
@@ -125,6 +159,8 @@ export function useAgentChat(ctx: SendContext) {
           }
           case 'confirmation_request': {
             assistantId = null;
+            streamingAssistantIdRef.current = null;
+            setStreamingAssistantId(null);
             appendItem({
               id: nextId(),
               role: 'confirmation',
@@ -145,6 +181,8 @@ export function useAgentChat(ctx: SendContext) {
           }
           case 'error': {
             assistantId = null;
+            streamingAssistantIdRef.current = null;
+            setStreamingAssistantId(null);
             appendItem({ id: nextId(), role: 'error', error: String(event.message ?? 'Unknown error') });
             break;
           }
@@ -153,6 +191,23 @@ export function useAgentChat(ctx: SendContext) {
           default:
             break;
         }
+      };
+
+      const finalizeStreamingAssistant = () => {
+        const id = streamingAssistantIdRef.current;
+        if (!id) return;
+        const now = Date.now();
+        setItems((prev) =>
+          prev.map((it) => {
+            if (it.id !== id || !it.reasoning) return it;
+            const patch: Partial<ChatItem> = {};
+            if (!it.reasoningStartedAt) patch.reasoningStartedAt = now;
+            if (!it.reasoningEndedAt) patch.reasoningEndedAt = now;
+            return Object.keys(patch).length ? { ...it, ...patch } : it;
+          })
+        );
+        streamingAssistantIdRef.current = null;
+        setStreamingAssistantId(null);
       };
 
       while (true) {
@@ -172,6 +227,7 @@ export function useAgentChat(ctx: SendContext) {
           }
         }
       }
+      finalizeStreamingAssistant();
     },
     [appendItem, updateItem, invalidateCaches]
   );
@@ -330,6 +386,7 @@ export function useAgentChat(ctx: SendContext) {
   return {
     items,
     isStreaming,
+    streamingAssistantId,
     conversationId,
     send,
     confirm,

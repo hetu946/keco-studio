@@ -923,9 +923,13 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     try {
       const userId = await getCurrentUserId(supabase);
       globalRequestCache.invalidate(`projects:list:${userId}`);
+      globalRequestCache.invalidate(`project:${projectId}`);
+      globalRequestCache.invalidate(`auth:project-access:${projectId}:${userId}`);
+      globalRequestCache.invalidate(`auth:project-role:${projectId}:${userId}`);
     } catch (err) {
       // If getting userId fails, invalidate all project-related cache
       console.warn('Failed to get userId for cache invalidation, clearing all project cache', err);
+      globalRequestCache.invalidate(`project:${projectId}`);
     }
 
     // Dispatch event to notify other components (ProjectsPage) to refresh their caches

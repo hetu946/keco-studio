@@ -21,7 +21,7 @@ export function useSidebarProjectRole(
   const [userRole, setUserRole] = useState<'admin' | 'editor' | 'viewer' | null>(null);
   const [isProjectOwner, setIsProjectOwner] = useState(false);
 
-  const fetchUserRole = useCallback(async () => {
+  const fetchUserRole = useCallback(async (attempt = 0) => {
     if (!isValidProjectId(currentProjectId) || !userProfile) {
       setUserRole(null);
       setIsProjectOwner(false);
@@ -44,16 +44,31 @@ export function useSidebarProjectRole(
 
       if (roleResponse.ok) {
         const roleResult = await roleResponse.json();
-        setUserRole(roleResult.role || null);
+        const role = roleResult.role || null;
+        setUserRole(role);
         setIsProjectOwner(roleResult.isOwner || false);
+
+        // Role can lag briefly right after project creation in CI; retry before showing admin-only UI.
+        if (role === null && attempt < 5) {
+          await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+          await fetchUserRole(attempt + 1);
+        }
       } else {
         setUserRole(null);
         setIsProjectOwner(false);
+        if (attempt < 5) {
+          await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+          await fetchUserRole(attempt + 1);
+        }
       }
     } catch (error) {
       console.error('[Sidebar] Error fetching user role:', error);
       setUserRole(null);
       setIsProjectOwner(false);
+      if (attempt < 5) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+        await fetchUserRole(attempt + 1);
+      }
     }
   }, [currentProjectId, userProfile, supabase]);
 

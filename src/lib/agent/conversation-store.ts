@@ -99,7 +99,7 @@ export async function loadConversationHistory(
 }
 
 /**
- * DeepSeek/OpenAI require every assistant message with tool_calls to be
+ * LLM providers (MiniMax, OpenAI-compatible) require every assistant message with tool_calls to be
  * immediately followed by a tool message per tool_call_id. Repair gaps left by
  * interrupted confirmation flows or partial DB writes.
  */

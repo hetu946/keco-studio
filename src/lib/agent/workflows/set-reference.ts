@@ -23,7 +23,7 @@ import type { PropertyConfig } from '@/lib/types/libraryAssets';
 import { buildLibraryReferenceSelections } from '../asset-emptiness';
 import { getLibraryAssets, getLibraryProperties } from '../data-access';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from './_shared';
+import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from '../tools/_shared';
 
 const ParamsSchema = z.object({
   sourceLibrary: z.string().min(1),

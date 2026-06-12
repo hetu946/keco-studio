@@ -1,4 +1,4 @@
-import { groupFieldsBySection, type SetupFieldInput } from '../../../src/lib/agent/tools/setup-library';
+import { groupFieldsBySection, type SetupFieldInput } from '../../../src/lib/agent/workflows/setup-library';
 
 describe('groupFieldsBySection', () => {
   it('groups fields by their section preserving order', () => {

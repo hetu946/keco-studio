@@ -27,7 +27,7 @@ import {
   errorFromOkResult,
   libraryFromLookupResult,
   resolveLibraryForTool,
-} from './_shared';
+} from '../tools/_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),

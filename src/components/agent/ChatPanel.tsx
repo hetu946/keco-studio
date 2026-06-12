@@ -67,7 +67,7 @@ export function ChatPanel() {
     ]
   );
 
-  const { items, isStreaming, conversationId, send, confirm, startNewConversation, loadConversation, appendNote } =
+  const { items, isStreaming, streamingAssistantId, conversationId, send, confirm, startNewConversation, loadConversation, appendNote } =
     useAgentChat(ctx);
 
   useEffect(() => {
@@ -131,7 +131,12 @@ export function ChatPanel() {
           </div>
         ) : (
           items.map((item) => (
-            <ChatMessage key={item.id} item={item} streaming={isStreaming} onDecision={confirm} />
+            <ChatMessage
+              key={item.id}
+              item={item}
+              streaming={isStreaming && item.id === streamingAssistantId}
+              onDecision={confirm}
+            />
           ))
         )}
       </div>

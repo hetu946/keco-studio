@@ -344,3 +344,56 @@
   cursor: pointer;
   font-size: 12px;
 }
+
+/* Reasoning / thinking block (DeepSeek-style collapsible) */
+.reasoningBlock {
+  margin-bottom: 8px;
+}
+.reasoningToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+  user-select: none;
+}
+.reasoningToggle:hover {
+  color: #374151;
+}
+.reasoningChevron {
+  display: inline-flex;
+  font-size: 10px;
+  color: #9ca3af;
+}
+.reasoningLabel {
+  font-weight: 500;
+}
+.reasoningContent {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #6b7280;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 280px;
+  overflow-y: auto;
+  border-left: 2px solid #e5e7eb;
+  padding: 4px 0 4px 10px;
+}
+.reasoningDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9ca3af;
+  margin-left: 2px;
+  animation: reasoningPulse 1.2s ease-in-out infinite;
+}
+@keyframes reasoningPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}

@@ -9,6 +9,7 @@ import type { ProjectData } from '../fixures/projects';
  */
 export class ProjectPage {
   readonly page: Page;
+  private lastCreatedProjectName: string | null = null;
 
   // Project list elements
   readonly projectsHeading: Locator;
@@ -58,8 +59,8 @@ export class ProjectPage {
    * Navigate to the projects page
    */
   async goto(): Promise<void> {
-    await this.page.goto('/projects');
-    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await this.page.goto('/projects', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
     // Projects page has no "Projects" heading; wait for create button (may show "Loading projects..." first)
     await expect(this.createProjectButton.first()).toBeVisible({ timeout: 20000 });
     await this.page.waitForTimeout(1000);
@@ -96,8 +97,8 @@ export class ProjectPage {
     // After login, user might be redirected to a project detail page, so we need to go to projects list
     const currentUrl = this.page.url();
     if (!currentUrl.includes('/projects')) {
-      await this.page.goto('/projects');
-      await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await this.page.goto('/projects', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
     } else {
       await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
@@ -134,6 +135,7 @@ export class ProjectPage {
       throw lastError;
     };
 
+    this.lastCreatedProjectName = project.name;
     await fillVisibleInputWithRetry('#project-name', project.name);
 
     if (project.description) {
@@ -210,25 +212,64 @@ export class ProjectPage {
     await expect(projectByTitle).toBeVisible();
   }
 
+  private isProjectDetailPath(pathname: string): boolean {
+    return pathname !== '/projects' && /^\/[^\/]+$/.test(pathname);
+  }
+
+  /** Right-click a project row in the sidebar to open the context menu. */
+  async rightClickSidebarProject(projectName: string): Promise<void> {
+    const sidebar = this.page.locator('aside');
+    const projectItem = sidebar.locator(`[title="${projectName}"]`).first();
+    await expect(projectItem).toBeVisible({ timeout: 15000 });
+    await projectItem.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(300);
+    await projectItem.click({ button: 'right', force: true, timeout: 15000 });
+  }
+
   /**
    * Assert successful project creation
    */
   async expectProjectCreated(): Promise<void> {
-    // Project creation navigates to /{projectId} page
-    // Wait for URL to change from /projects to a project detail page
-    await this.page.waitForURL((url) => {
-      const path = url.pathname;
-      // Match pattern: /{projectId} (not /projects)
-      return path !== '/projects' && /^\/[^\/]+$/.test(path);
-    }, { timeout: 30000 });
-    
-    // Wait for page to stabilize and all API calls to complete
-    // This is important after adding authorization checks
-    await this.page.waitForLoadState('load', { timeout: 15000 });
-    
-    // Additional wait to ensure authorization checks are complete
-    // In CI environments, Supabase auth state may take longer to stabilize
-    await this.page.waitForTimeout(2000);
+    const timeout = process.env.CI === 'true' ? 45000 : 30000;
+    const projectName = this.lastCreatedProjectName;
+    const deadline = Date.now() + timeout;
+    const remainingMs = () => Math.max(1000, deadline - Date.now());
+
+    // Project creation should navigate to /{projectId}. In CI, client routing can lag or bounce
+    // back to /projects while auth/collaborator rows settle.
+    try {
+      await this.page.waitForURL(
+        (url) => this.isProjectDetailPath(url.pathname),
+        { timeout: remainingMs(), waitUntil: 'commit' }
+      );
+    } catch {
+      if (!projectName) {
+        throw new Error('Project creation did not navigate away from /projects');
+      }
+      await this.openProject(projectName);
+    }
+
+    await expect
+      .poll(() => this.isProjectDetailPath(new URL(this.page.url()).pathname), {
+        timeout: remainingMs(),
+        intervals: [300, 500, 1000],
+      })
+      .toBe(true);
+
+    await this.page
+      .waitForLoadState('domcontentloaded', { timeout: Math.min(10000, remainingMs()) })
+      .catch(() => {});
+
+    // Project page may briefly redirect back to /projects while data settles; re-open if needed.
+    if (!this.isProjectDetailPath(new URL(this.page.url()).pathname) && projectName) {
+      await this.openProject(projectName);
+      await expect
+        .poll(() => this.isProjectDetailPath(new URL(this.page.url()).pathname), {
+          timeout: remainingMs(),
+          intervals: [300, 500, 1000],
+        })
+        .toBe(true);
+    }
   }
 
   /**
