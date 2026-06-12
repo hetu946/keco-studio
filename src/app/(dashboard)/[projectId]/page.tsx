@@ -69,17 +69,31 @@ export default function ProjectPage() {
   const [userRole, setUserRole] = useState<'admin' | 'editor' | 'viewer' | null>(null); 
 
   // Use React Query for data fetching
-  const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
+  const {
+    data: project,
+    isLoading: projectLoading,
+    error: projectError,
+    isFetching: projectFetching,
+  } = useQuery({
     queryKey: queryKeys.project(projectId),
     queryFn: async () => {
       const data = await getProject(supabase, projectId);
       if (!data) {
-        window.location.replace('/projects');
-        return null;
+        throw new Error('Project not found');
       }
       return data;
     },
     enabled: !!projectId,
+    retry: (failureCount, error) => {
+      if (failureCount >= 5) return false;
+      const message = (error as Error)?.message?.toLowerCase() ?? '';
+      return (
+        message.includes('not found') ||
+        message.includes('unauthorized') ||
+        message.includes('collaborator')
+      );
+    },
+    retryDelay: (attemptIndex) => Math.min(750 * 2 ** attemptIndex, 5000),
   });
 
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
@@ -117,16 +131,21 @@ export default function ProjectPage() {
   const loading = projectLoading || foldersLoading || librariesLoading;
   const error = projectError ? (projectError as any)?.message || 'Failed to load project' : null;
 
-  // Handle authorization errors
+  // Redirect only on definitive unauthorized access, not transient "not found" after creation.
   useEffect(() => {
-    if (projectError) {
-      const err = projectError as any;
-      if (err instanceof AuthorizationError || err?.name === 'AuthorizationError' || 
-          err?.message?.includes('Unauthorized') || err?.message?.includes('not found')) {
-        window.location.replace('/projects');
-      }
+    if (!projectError || projectFetching || project) return;
+    const err = projectError as any;
+    const message = String(err?.message ?? '').toLowerCase();
+    const isUnauthorized =
+      err instanceof AuthorizationError ||
+      err?.name === 'AuthorizationError' ||
+      message.includes('unauthorized');
+    const isTransientNotFound = message.includes('not found') || message.includes('project not found');
+
+    if (isUnauthorized && !isTransientNotFound) {
+      window.location.replace('/projects');
     }
-  }, [projectError]);
+  }, [projectError, projectFetching, project]);
 
   // Fetch user role in current project
   useEffect(() => {

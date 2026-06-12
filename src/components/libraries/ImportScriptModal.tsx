@@ -13,6 +13,9 @@ type ImportScriptModalProps = {
   folderId: string;
   onClose: () => void;
   onImported?: (libraryId: string) => void;
+  /** Pre-fill the text input (used by the agent "Edit in Import Modal" handoff). */
+  initialText?: string;
+  initialLibraryName?: string;
 };
 
 type PreviewInfo = {
@@ -117,6 +120,8 @@ export function ImportScriptModal({
   folderId,
   onClose,
   onImported,
+  initialText,
+  initialLibraryName,
 }: ImportScriptModalProps) {
   const supabase = useSupabase();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +135,15 @@ export function ImportScriptModal({
   const [showFormatGuide, setShowFormatGuide] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  // Pre-fill from the agent handoff when opened with initial content.
+  useEffect(() => {
+    if (open && typeof initialText === 'string' && initialText.length > 0) {
+      setInputMode('text');
+      setTextInput(initialText);
+      if (initialLibraryName) setLibraryName(initialLibraryName);
+    }
+  }, [open, initialText, initialLibraryName]);
 
   useEffect(() => {
     if (!open) {

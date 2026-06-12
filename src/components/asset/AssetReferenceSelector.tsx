@@ -15,6 +15,11 @@ import assetRefAssetInfoIcon from '@/assets/images/ProjectDescIcon.svg';
 import assetRefInputLeftIcon from '@/assets/images/assetRefInputLeftIcon.svg';
 import assetRefDetailLibExpandIcon from '@/assets/images/assetRefDetailLibExpandIcon.svg';
 import assetRefDetailLibIcon from '@/assets/images/assetRefDetailLibIcon.svg';
+import {
+  assetHasAnyNonEmptyDisplayValue,
+  getReferencePickerDisplayValue,
+  hasNonEmptyDisplayValue,
+} from '@/lib/utils/assetEmptiness';
 import styles from './AssetReferenceSelector.module.css';
 
 type Asset = {
@@ -168,15 +173,12 @@ export function AssetReferenceSelector({
         const assetsWithData = assetsData
           .map((asset) => {
             const assetValues = assetValuesMap.get(asset.id);
-            
-            // Get first column value
-            let firstColumnValue = '';
-            if (firstFieldId && assetValues?.has(firstFieldId)) {
-              const rawValue = assetValues.get(firstFieldId);
-              if (rawValue !== null && rawValue !== undefined) {
-                firstColumnValue = String(rawValue).trim();
-              }
-            }
+            const flatValues = assetValues
+              ? Object.fromEntries(assetValues.entries())
+              : {};
+            const firstColumnValue = firstFieldId
+              ? getReferencePickerDisplayValue(flatValues, firstFieldId)
+              : '';
 
             return {
               ...asset,
@@ -185,34 +187,16 @@ export function AssetReferenceSelector({
             };
           })
           .filter((asset) => {
-            // Filter out assets where ALL fields are empty/null
             const assetValues = assetValuesMap.get(asset.id);
-            
-            if (!assetValues || assetValues.size === 0) {
-              return false; // No values at all
-            }
-            
-            // Check if at least one field has a non-empty value
-            let hasNonEmptyValue = false;
-            for (const [fieldId, value] of assetValues.entries()) {
-              if (value !== null && value !== undefined) {
-                const strValue = String(value).trim();
-                if (strValue !== '' && strValue !== 'null' && strValue !== 'undefined') {
-                  hasNonEmptyValue = true;
-                  break;
-                }
-              }
-            }
-            
-            return hasNonEmptyValue;
+            const flatValues = assetValues
+              ? Object.fromEntries(assetValues.entries())
+              : {};
+            if (!assetHasAnyNonEmptyDisplayValue(flatValues)) return false;
+            if (!firstFieldId) return false;
+            return hasNonEmptyDisplayValue(assetValues?.get(firstFieldId));
           });
 
-        // Sort by first column value
-        assetsWithData.sort((a, b) => {
-          const aName = a.firstColumnValue || 'Untitled';
-          const bName = b.firstColumnValue || 'Untitled';
-          return aName.localeCompare(bName);
-        });
+        assetsWithData.sort((a, b) => a.firstColumnValue.localeCompare(b.firstColumnValue));
         
         setAssets(assetsWithData);
         setFilteredAssets(assetsWithData);
@@ -263,14 +247,13 @@ export function AssetReferenceSelector({
               .select('value_json')
               .eq('asset_id', resolvedValue)
               .eq('field_id', firstFieldId)
-              .single();
+              .maybeSingle();
 
-            if (valueData?.value_json !== null && valueData?.value_json !== undefined) {
-              const rawValue = valueData.value_json;
-              const strValue = String(rawValue).trim();
-              if (strValue !== '' && strValue !== 'null' && strValue !== 'undefined') {
-                firstColumnValue = strValue;
-              }
+            if (valueData) {
+              firstColumnValue = getReferencePickerDisplayValue(
+                { [firstFieldId]: valueData.value_json },
+                firstFieldId
+              );
             }
           }
 
@@ -279,7 +262,7 @@ export function AssetReferenceSelector({
             name: data.name,
             library_id: data.library_id,
             library_name: (data.libraries as any)?.name,
-            firstColumnValue: firstColumnValue || 'Untitled',
+            firstColumnValue,
           });
         }
       } catch (error) {
@@ -295,10 +278,9 @@ export function AssetReferenceSelector({
     if (!searchText.trim()) {
       setFilteredAssets(assets);
     } else {
-      const filtered = assets.filter((asset) => {
-        const searchValue = asset.firstColumnValue || 'Untitled';
-        return searchValue.toLowerCase().includes(searchText.toLowerCase());
-      });
+      const filtered = assets.filter((asset) =>
+        asset.firstColumnValue.toLowerCase().includes(searchText.toLowerCase())
+      );
       setFilteredAssets(filtered);
     }
   }, [searchText, assets]);
@@ -500,12 +482,12 @@ export function AssetReferenceSelector({
               <Avatar
                 size={16}
                 style={{ 
-                  backgroundColor: getAvatarColor(selectedAsset.id, selectedAsset.firstColumnValue || 'Untitled'),
+                  backgroundColor: getAvatarColor(selectedAsset.id, selectedAsset.firstColumnValue || selectedAsset.name),
                   borderRadius: '2.4px'
                 }}
                 className={styles.referenceAvatar}
               >
-                {getAvatarText(selectedAsset.firstColumnValue || 'Untitled')}
+                {getAvatarText(selectedAsset.firstColumnValue || selectedAsset.name)}
               </Avatar>
               ) : (
                 <span className={styles.placeholder}>Select asset...</span>
@@ -588,10 +570,10 @@ export function AssetReferenceSelector({
                     onMouseLeave={handleAssetLeave}
                   >
                     <Avatar
-                      style={{ backgroundColor: getAvatarColor(asset.id, asset.firstColumnValue || 'Untitled') }}
+                      style={{ backgroundColor: getAvatarColor(asset.id, asset.firstColumnValue) }}
                       size={30}
                     >
-                      {getAvatarText(asset.firstColumnValue || 'Untitled')}
+                      {getAvatarText(asset.firstColumnValue)}
                     </Avatar>
                   </div>
                   ))
@@ -617,16 +599,16 @@ export function AssetReferenceSelector({
             <div className={styles.detailsContent}>
               <div className={styles.avatarSection}>
                 <Avatar
-                  style={{ backgroundColor: getAvatarColor(selectedAsset?.id || '', selectedAsset?.firstColumnValue || 'Untitled') }}
+                  style={{ backgroundColor: getAvatarColor(selectedAsset?.id || '', selectedAsset?.firstColumnValue || selectedAsset?.name || '') }}
                   size={60}
                 >
-                  {getAvatarText(selectedAsset?.firstColumnValue || 'Untitled')}
+                  {getAvatarText(selectedAsset?.firstColumnValue || selectedAsset?.name || '')}
                 </Avatar>
               </div>
               <div className={styles.detailsContentRight}>
                 <div className={styles.detailsSection}>
                   <div className={styles.detailLabel}>{firstColumnLabel}</div>
-                  <div className={styles.detailValue}>{selectedAsset?.firstColumnValue || 'Untitled'}</div>
+                  <div className={styles.detailValue}>{selectedAsset?.firstColumnValue || selectedAsset?.name || ''}</div>
                 </div>
                 <div className={styles.detailsSection}>
                   <div className={styles.detailLabel}>From Library</div>
@@ -685,16 +667,16 @@ export function AssetReferenceSelector({
             <div className={styles.detailsContent}>
               <div className={styles.avatarSection}>
                 <Avatar
-                  style={{ backgroundColor: getAvatarColor(hoveredAsset.id, hoveredAsset.firstColumnValue || 'Untitled') }}
+                  style={{ backgroundColor: getAvatarColor(hoveredAsset.id, hoveredAsset.firstColumnValue) }}
                   size={60}
                 >
-                  {getAvatarText(hoveredAsset.firstColumnValue || 'Untitled')}
+                  {getAvatarText(hoveredAsset.firstColumnValue)}
                 </Avatar>
               </div>
               <div className={styles.detailsContentRight}>
                 <div className={styles.detailsSection}>
                   <div className={styles.detailLabel}>{firstColumnLabel}</div>
-                  <div className={styles.detailValue}>{hoveredAsset.firstColumnValue || 'Untitled'}</div>
+                  <div className={styles.detailValue}>{hoveredAsset.firstColumnValue}</div>
                 </div>
                 <div className={styles.detailsSection}>
                   <div className={styles.detailLabel}>From Library</div>

@@ -20,6 +20,16 @@ function searchDropdown(page: Page): Locator {
   return page.locator('div[class*="searchDropdown"]').first();
 }
 
+async function closeCellSearch(page: Page): Promise<void> {
+  const clearButton = page.getByRole('button', { name: /clear search/i });
+  if (await clearButton.isVisible().catch(() => false)) {
+    await clearButton.click();
+  }
+  await page.keyboard.press('Escape');
+  const dropdown = searchDropdown(page);
+  await expect(dropdown).not.toBeVisible({ timeout: 5000 }).catch(() => {});
+}
+
 async function openCellSearch(page: Page): Promise<{ input: Locator; dropdown: Locator }> {
   const input = searchInput(page);
   await expect(input).toBeVisible({ timeout: 15000 });
@@ -194,14 +204,22 @@ async function openReferenceModalOnCell(
   rowLabel: string,
   refColumnName: string,
 ): Promise<Locator> {
-  const refCell = await getTableCellForRowAndColumn(page, rowLabel, refColumnName);
-  await refCell.click();
-  await page.waitForTimeout(500);
+  await expect(page.locator('thead').getByText(refColumnName, { exact: true })).toBeVisible({
+    timeout: 15000,
+  });
 
-  const refOpenTarget = refCell
+  const refCell = await getTableCellForRowAndColumn(page, rowLabel, refColumnName);
+  await refCell.scrollIntoViewIfNeeded();
+  await refCell.click();
+  await page.waitForTimeout(300);
+
+  const refField = refCell.locator('[class*="referenceFieldWrapper"]').first();
+  await expect(refField).toBeVisible({ timeout: 15000 });
+
+  const refOpenTarget = refField
     .locator('[class*="referenceArrowTile"], [data-reference-background="true"]')
     .first();
-  await expect(refOpenTarget).toBeVisible({ timeout: 10000 });
+  await expect(refOpenTarget).toBeVisible({ timeout: 15000 });
   await refOpenTarget.click();
 
   const modal = page.locator('[class*="modalContainer"]').filter({ hasText: 'APPLY REFERENCE' });
@@ -276,9 +294,23 @@ type ReplaceFixture = {
 };
 
 async function openLibraryTable(page: Page, libraryName: string): Promise<void> {
-  const sidebarLibraryItem = page.locator('aside').locator(`[title="${libraryName}"]`).first();
+  await closeCellSearch(page);
+
+  const sidebarLibraryItem = page
+    .getByRole('treeitem')
+    .filter({ has: page.locator(`[title="${libraryName}"]`) })
+    .first();
   await expect(sidebarLibraryItem).toBeVisible({ timeout: 15000 });
+  await sidebarLibraryItem.scrollIntoViewIfNeeded();
   await sidebarLibraryItem.click();
+
+  // Sidebar click can be ignored while search UI is still focused; wait for breadcrumb to update.
+  const libraryBreadcrumb = page
+    .getByRole('banner')
+    .getByRole('button')
+    .filter({ hasText: libraryName.slice(0, Math.min(24, libraryName.length)) });
+  await expect(libraryBreadcrumb).toBeVisible({ timeout: 20000 });
+
   await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
   await waitForTableReady(page);
 }

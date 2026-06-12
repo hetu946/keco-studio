@@ -48,6 +48,39 @@ export class LibraryPage {
   readonly successMessage: Locator;
   readonly errorMessage: Locator;
 
+  private isProjectScopedPath(pathname: string): boolean {
+    if (pathname === '/projects' || pathname === '/' || pathname.startsWith('/auth')) {
+      return false;
+    }
+    // /{projectId} and nested routes such as /{projectId}/{libraryId}
+    return /^\/[^/]+(\/.*)?$/.test(pathname);
+  }
+
+  private async waitForSidebarAdminRole(): Promise<void> {
+    const roleTimeout = process.env.CI === 'true' ? 30000 : 20000;
+
+    await expect
+      .poll(() => this.isProjectScopedPath(new URL(this.page.url()).pathname), {
+        timeout: roleTimeout,
+        intervals: [300, 500, 1000, 2000],
+      })
+      .toBe(true);
+
+    await expect(this.sidebarAddButton).toBeVisible({ timeout: roleTimeout });
+  }
+
+  /** Right-click a sidebar tree row (library or folder) to open the context menu. */
+  async rightClickTreeItem(title: string): Promise<void> {
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    const sidebar = this.page.getByRole('tree');
+    await expect(sidebar).toBeVisible({ timeout: 15000 });
+    const item = sidebar.locator(`[title="${title}"]`).first();
+    await expect(item).toBeVisible({ timeout: 15000 });
+    await item.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(300);
+    await item.click({ button: 'right', force: true, timeout: 15000 });
+  }
+
   constructor(page: Page) {
     this.page = page;
 
@@ -205,7 +238,7 @@ export class LibraryPage {
     // Note: This button is conditionally rendered only when userRole === 'admin'.
     // The user role is fetched asynchronously via /api/projects/{projectId}/role,
     // so we need a longer timeout to allow the API call to complete and the button to render.
-    await expect(this.sidebarAddButton).toBeVisible({ timeout: 15000 });
+    await this.waitForSidebarAdminRole();
     await this.sidebarAddButton.click();
 
     // Step 2: Wait for AddLibraryMenu to appear and click "Create new library"
@@ -277,7 +310,7 @@ export class LibraryPage {
     // Note: This button is conditionally rendered only when userRole === 'admin'.
     // The user role is fetched asynchronously via /api/projects/{projectId}/role,
     // so we need a longer timeout to allow the API call to complete and the button to render.
-    await expect(this.sidebarAddButton).toBeVisible({ timeout: 15000 });
+    await this.waitForSidebarAdminRole();
     await this.sidebarAddButton.click();
 
     // Step 2: Wait for AddLibraryMenu to appear and click "Create new folder"
