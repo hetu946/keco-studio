@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageOutlined } from '@ant-design/icons';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { useNavigation } from '@/lib/contexts/NavigationContext';
 import { getActiveSectionName } from '@/lib/agent/page-context';
 import { useAgentChat } from './useAgentChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ConversationList } from './ConversationList';
+import { clearLastConversationById } from './agentChatStorage';
 import styles from './ChatPanel.module.css';
 
 export function ChatPanel() {
+  const { userProfile } = useAuth();
   const {
     currentProjectId,
     currentLibraryId,
@@ -50,6 +53,7 @@ export function ChatPanel() {
 
   const ctx = useMemo(
     () => ({
+      userId: userProfile?.id,
       projectId: currentProjectId ?? '',
       currentFolderId: currentFolderId ?? undefined,
       currentFolderName: currentFolderName ?? undefined,
@@ -58,6 +62,7 @@ export function ChatPanel() {
       currentSectionName,
     }),
     [
+      userProfile?.id,
       currentProjectId,
       currentFolderId,
       currentFolderName,
@@ -113,11 +118,18 @@ export function ChatPanel() {
         </div>
         {showHistory && (
           <ConversationList
-            projectId={currentProjectId}
             activeId={conversationId}
             onSelect={(id) => {
               setShowHistory(false);
               void loadConversation(id);
+            }}
+            onDelete={(id) => {
+              if (userProfile?.id) {
+                clearLastConversationById(userProfile.id, id);
+              }
+              if (conversationId === id) {
+                startNewConversation();
+              }
             }}
             onClose={() => setShowHistory(false)}
           />
@@ -141,7 +153,7 @@ export function ChatPanel() {
         )}
       </div>
 
-      <ChatInput disabled={isStreaming} onSend={send} />
+      <ChatInput userId={userProfile?.id} disabled={isStreaming} onSend={send} />
     </div>
   );
 }

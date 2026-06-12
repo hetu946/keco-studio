@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate } from '@/lib/agent/route-auth';
 import { resolveUserRole, AgentAccessError } from '@/lib/agent/permissions';
-import { listConversations } from '@/lib/agent/conversation-store';
+import { listAllConversations, listConversations } from '@/lib/agent/conversation-store';
 
 const isUuid = (v: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -10,6 +10,19 @@ export async function GET(request: NextRequest) {
   const authed = await authenticate(request);
   if (authed instanceof NextResponse) return authed;
   const { supabase, user } = authed;
+
+  const scope = String(request.nextUrl.searchParams.get('scope') ?? '').trim();
+  if (scope === 'all') {
+    try {
+      const conversations = await listAllConversations(supabase, user.id);
+      return NextResponse.json({ conversations });
+    } catch (e) {
+      return NextResponse.json(
+        { error: (e as Error).message || 'Failed to list conversations' },
+        { status: 400 }
+      );
+    }
+  }
 
   const projectId = String(request.nextUrl.searchParams.get('projectId') ?? '').trim();
   if (!projectId || !isUuid(projectId)) {
