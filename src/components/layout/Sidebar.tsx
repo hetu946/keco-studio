@@ -365,13 +365,12 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     }
   }, [currentIds.projectId]);
 
-  // Smart cache refresh: If user is viewing a project that's not in the sidebar,
-  // it might mean they were just added as a collaborator. Refresh the projects list.
+  // Smart cache refresh: If user is viewing a project that's not in the sidebar list
+  // (including empty list after first project creation), refresh projects.
   useEffect(() => {
-    if (currentIds.projectId && projects.length > 0 && !loadingProjects) {
+    if (currentIds.projectId && !loadingProjects) {
       const currentProjectExists = projects.some(p => p.id === currentIds.projectId);
       if (!currentProjectExists) {
-
         // Clear globalRequestCache and refetch
         (async () => {
           try {
@@ -923,10 +922,16 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
     try {
       const userId = await getCurrentUserId(supabase);
       globalRequestCache.invalidate(`projects:list:${userId}`);
+      globalRequestCache.invalidate(`project:${projectId}`);
+      globalRequestCache.invalidate(`auth:project-access:${projectId}:${userId}`);
+      globalRequestCache.invalidate(`auth:project-role:${projectId}:${userId}`);
     } catch (err) {
       // If getting userId fails, invalidate all project-related cache
       console.warn('Failed to get userId for cache invalidation, clearing all project cache', err);
+      globalRequestCache.invalidate(`project:${projectId}`);
     }
+
+    queryClient.invalidateQueries({ queryKey: ['project', projectId] });
 
     // Dispatch event to notify other components (ProjectsPage) to refresh their caches
     window.dispatchEvent(new CustomEvent('projectCreated'));
@@ -1062,9 +1067,7 @@ export function Sidebar({ userProfile, onAuthRequest }: SidebarProps) {
           onContextMenu={handleContextMenu}
         />
 
-        {currentIds.projectId &&
-          projects.length > 0 &&
-          projects.some((p) => p.id === currentIds.projectId) && (
+        {currentIds.projectId && (
             <SidebarLibrariesSection
               currentIds={currentIds}
               libraries={libraries}

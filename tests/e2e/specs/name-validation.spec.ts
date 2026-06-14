@@ -25,6 +25,9 @@ import { users } from '../fixures/users';
  */
 
 test.describe('Name Validation Tests', () => {
+  // Serial: tests share seedEmpty and create projects/libraries in sequence.
+  test.describe.configure({ mode: 'serial' });
+
   let projectPage: ProjectPage;
   let libraryPage: LibraryPage;
 
@@ -83,7 +86,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project
       await test.step('Create test project', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
       });
 
@@ -135,7 +138,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project and library
       await test.step('Create test project and library', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         
         const sidebar = page.getByRole('tree');
@@ -197,7 +200,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project and folder
       await test.step('Create test project and folder', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         
         const sidebar = page.getByRole('tree');
@@ -263,7 +266,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project
       await test.step('Create test project', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
       });
 
@@ -331,7 +334,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project and library
       await test.step('Create test project and library', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         
         const sidebar = page.getByRole('tree');
@@ -409,7 +412,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project and folder
       await test.step('Create test project and folder', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         
         const sidebar = page.getByRole('tree');
@@ -491,7 +494,7 @@ test.describe('Name Validation Tests', () => {
 
       await test.step('Create test project', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
       });
 
@@ -536,7 +539,7 @@ test.describe('Name Validation Tests', () => {
 
       await test.step('Create test project and library', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         const sidebar = page.getByRole('tree');
         await expect(sidebar).toBeVisible({ timeout: 15000 });
@@ -589,7 +592,7 @@ test.describe('Name Validation Tests', () => {
 
       await test.step('Create test project and folder', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         const sidebar = page.getByRole('tree');
         await expect(sidebar).toBeVisible({ timeout: 15000 });
@@ -651,13 +654,13 @@ test.describe('Name Validation Tests', () => {
       // Create two test projects
       await test.step('Create two test projects', async () => {
         await projectPage.createProject(testProject1);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject1.name);
         await libraryPage.waitForPageLoad();
         
         // Navigate back to projects page to create second project
         await projectPage.goto();
         await projectPage.createProject(testProject2);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject2.name);
         await libraryPage.waitForPageLoad();
       });
 
@@ -708,7 +711,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project and two libraries
       await test.step('Create test project and two libraries', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         
         const sidebar = page.getByRole('tree');
@@ -777,7 +780,7 @@ test.describe('Name Validation Tests', () => {
       // Create a test project and two folders
       await test.step('Create test project and two folders', async () => {
         await projectPage.createProject(testProject);
-        await projectPage.expectProjectCreated();
+        await projectPage.expectProjectCreated(testProject.name);
         await libraryPage.waitForPageLoad();
         
         const sidebar = page.getByRole('tree');

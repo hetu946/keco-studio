@@ -71,16 +71,30 @@ export default function ProjectPage() {
   // Use React Query for data fetching
   const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
     queryKey: queryKeys.project(projectId),
-    queryFn: async () => {
-      const data = await getProject(supabase, projectId);
-      if (!data) {
-        window.location.replace('/projects');
-        return null;
-      }
-      return data;
-    },
+    queryFn: () => getProject(supabase, projectId),
     enabled: !!projectId,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * (attemptIndex + 1), 3000),
   });
+
+  // Redirect only after fetch settles — avoids bouncing to /projects on transient cache misses
+  // right after project creation.
+  useEffect(() => {
+    if (!projectId || projectLoading) return;
+    if (!project && !projectError) {
+      window.location.replace('/projects');
+    }
+  }, [projectId, projectLoading, project, projectError]);
+
+  useEffect(() => {
+    const handleProjectCreated = () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+    };
+    window.addEventListener('projectCreated' as any, handleProjectCreated as EventListener);
+    return () => {
+      window.removeEventListener('projectCreated' as any, handleProjectCreated as EventListener);
+    };
+  }, [projectId, queryClient]);
 
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: queryKeys.projectFolders(projectId),

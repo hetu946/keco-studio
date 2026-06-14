@@ -20,7 +20,7 @@ async function createLibraryForDatatypeTests(page: Page): Promise<void> {
   const library = generateLibraryData();
 
   await projectPage.createProject(project);
-  await projectPage.expectProjectCreated();
+  await projectPage.expectProjectCreated(project.name);
   await libraryPage.waitForPageLoad();
 
   await libraryPage.createLibraryUnderProject(library);

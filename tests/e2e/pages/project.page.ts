@@ -213,7 +213,7 @@ export class ProjectPage {
   /**
    * Assert successful project creation
    */
-  async expectProjectCreated(): Promise<void> {
+  async expectProjectCreated(projectName?: string): Promise<void> {
     // Project creation navigates to /{projectId} page
     // Wait for URL to change from /projects to a project detail page
     await this.page.waitForURL((url) => {
@@ -221,14 +221,17 @@ export class ProjectPage {
       // Match pattern: /{projectId} (not /projects)
       return path !== '/projects' && /^\/[^\/]+$/.test(path);
     }, { timeout: 30000 });
-    
+
     // Wait for page to stabilize and all API calls to complete
-    // This is important after adding authorization checks
     await this.page.waitForLoadState('load', { timeout: 15000 });
-    
-    // Additional wait to ensure authorization checks are complete
-    // In CI environments, Supabase auth state may take longer to stabilize
-    await this.page.waitForTimeout(2000);
+
+    // Sidebar libraries tree mounts when project context is ready (folders/libraries loaded)
+    await expect(this.page.getByRole('tree')).toBeVisible({ timeout: 20000 });
+
+    if (projectName) {
+      const sidebar = this.page.locator('aside');
+      await expect(sidebar.locator(`[title="${projectName}"]`)).toBeVisible({ timeout: 15000 });
+    }
   }
 
   /**
