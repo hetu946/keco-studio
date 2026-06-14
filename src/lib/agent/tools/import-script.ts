@@ -232,7 +232,7 @@ export const importScript: AgentTool = {
     'Convert free-form narrative text into keco-studio standard script format and import it as a library. Use this when the user pastes story text, wants to create a script from prose, or asks to import narrative content.',
   category: 'write',
   confirmationMode: 'post_preview',
-  requiredPermission: 'admin',
+  requiredPermission: 'editor',
   parameters: {
     type: 'object',
     properties: {

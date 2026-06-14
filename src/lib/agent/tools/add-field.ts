@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { addLibraryField } from '@/lib/services/libraryAssetsService';
 import { normalizeFieldDataType, SUPPORTED_FIELD_DATA_TYPES } from '../field-data-type';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { findLibraryByName } from './_shared';
+import { errorFromLookupResult, libraryFromLookupResult, resolveLibraryForTool } from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -49,12 +49,25 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
-  const { library, available } = await findLibraryByName(ctx.supabase, ctx.projectId, libraryName);
-  if (!library) {
-    return {
-      success: false,
-      error: `Library "${libraryName}" not found. Available libraries: ${available.join(', ') || '(none)'}`,
-    };
+  const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
+  }
+  const library = libraryFromLookupResult(libraryResult);
+
+  // Resolve reference library names → UUIDs (DB column is uuid[]).
+  let resolvedReferenceLibraryIds: string[] | undefined;
+  if (parsed.data.referenceLibraries && parsed.data.referenceLibraries.length > 0) {
+    resolvedReferenceLibraryIds = [];
+    for (const refName of parsed.data.referenceLibraries) {
+      const refResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, refName, ctx);
+      const refLookupError = errorFromLookupResult(refResult);
+      if (refLookupError !== undefined) {
+        return { success: false, error: refLookupError };
+      }
+      resolvedReferenceLibraryIds.push(libraryFromLookupResult(refResult).id);
+    }
   }
 
   const sectionId = `${library.id}:${sectionName}`;
@@ -71,7 +84,7 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
         description: parsed.data.description,
         required: parsed.data.required,
         enumOptions: parsed.data.enumOptions,
-        referenceLibraries: parsed.data.referenceLibraries,
+        referenceLibraries: resolvedReferenceLibraryIds,
         formulaExpression: parsed.data.formulaExpression,
       }
     );

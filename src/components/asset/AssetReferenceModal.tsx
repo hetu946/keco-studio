@@ -14,6 +14,12 @@ import {
   referenceSelectionsToValue,
   type ReferenceSelection,
 } from '@/lib/utils/referenceValue';
+import {
+  assetHasAnyNonEmptyDisplayValue,
+  cellDisplayString,
+  getReferencePickerDisplayValue,
+  hasNonEmptyDisplayValue,
+} from '@/lib/utils/assetEmptiness';
 import styles from './AssetReferenceModal.module.css';
 
 type Asset = {
@@ -43,13 +49,6 @@ interface AssetReferenceModalProps {
   referenceLibraries?: string[];
   onClose: () => void;
   onApply: (selections: ReferenceSelection[] | null) => void;
-}
-
-function cellDisplayString(raw: unknown): string {
-  if (raw === null || raw === undefined) return '';
-  const s = String(raw).trim();
-  if (s === '' || s === 'null' || s === 'undefined') return '';
-  return s;
 }
 
 export function AssetReferenceModal({
@@ -168,6 +167,11 @@ export function AssetReferenceModal({
 
         const libName = libraries.find((lib) => lib.id === selectedLibraryId)?.name;
 
+        const flatValues: Record<string, Record<string, unknown>> = {};
+        assetValuesMap.forEach((m, assetId) => {
+          flatValues[assetId] = Object.fromEntries(m.entries());
+        });
+
         const rows = assetsData
           .map((asset) => ({
             id: asset.id,
@@ -175,20 +179,7 @@ export function AssetReferenceModal({
             library_id: asset.library_id,
             library_name: libName,
           }))
-          .filter((asset) => {
-            const assetValues = assetValuesMap.get(asset.id);
-            if (!assetValues || assetValues.size === 0) return false;
-            for (const [, val] of assetValues.entries()) {
-              const str = cellDisplayString(val);
-              if (str !== '') return true;
-            }
-            return false;
-          });
-
-        const flatValues: Record<string, Record<string, unknown>> = {};
-        assetValuesMap.forEach((m, assetId) => {
-          flatValues[assetId] = Object.fromEntries(m.entries());
-        });
+          .filter((asset) => assetHasAnyNonEmptyDisplayValue(flatValues[asset.id] ?? {}));
 
         setAssetRows(rows);
         setValuesByAsset(flatValues);
@@ -222,23 +213,17 @@ export function AssetReferenceModal({
     return assetRows
       .map((row) => {
         const vals = valuesByAsset[row.id] || {};
-        const displayValue = cellDisplayString(vals[selectedColumnFieldId]);
-        return {
-          ...row,
-          displayValue: displayValue || 'Untitled',
-        };
+        const displayValue = getReferencePickerDisplayValue(vals, selectedColumnFieldId);
+        return { ...row, displayValue };
       })
-      .sort((a, b) =>
-        (a.displayValue || 'Untitled').localeCompare(b.displayValue || 'Untitled')
-      );
+      .filter((row) => hasNonEmptyDisplayValue(row.displayValue))
+      .sort((a, b) => a.displayValue.localeCompare(b.displayValue));
   }, [assetRows, valuesByAsset, selectedColumnFieldId]);
 
   const filteredAssets = useMemo(() => {
     const q = searchText.trim().toLowerCase();
     if (!q) return assetsWithDisplay;
-    return assetsWithDisplay.filter((asset) =>
-      (asset.displayValue || 'Untitled').toLowerCase().includes(q)
-    );
+    return assetsWithDisplay.filter((asset) => asset.displayValue.toLowerCase().includes(q));
   }, [searchText, assetsWithDisplay]);
 
   const selectedColumnLabel = useMemo(() => {
@@ -295,8 +280,8 @@ export function AssetReferenceModal({
 
       assetIds.forEach((assetId) => {
         const vals = valuesByAsset[assetId] || {};
-        const displayRaw = vals[fieldId];
-        const displayValue = cellDisplayString(displayRaw) || 'Untitled';
+        const displayValue = getReferencePickerDisplayValue(vals, fieldId);
+        if (!hasNonEmptyDisplayValue(displayValue)) return;
         allSelections.push({
           assetId,
           fieldId,
@@ -437,18 +422,18 @@ export function AssetReferenceModal({
                       onClick={() => handleAssetToggle(asset)}
                     >
                       <Tooltip
-                        title={asset.displayValue || 'Untitled'}
+                        title={asset.displayValue}
                         zIndex={2100}
                         getPopupContainer={() => document.body}
                       >
                         <Avatar
                           style={{
-                            backgroundColor: getAvatarColor(asset.id, asset.displayValue || 'Untitled'),
+                            backgroundColor: getAvatarColor(asset.id, asset.displayValue),
                           }}
                           size={30}
                           className={styles.assetIcon}
                         >
-                          {getAvatarText(asset.displayValue || 'Untitled')}
+                          {getAvatarText(asset.displayValue)}
                         </Avatar>
                       </Tooltip>
                       {selectedAssetIdsForCurrentColumn.includes(asset.id) ? (
@@ -478,21 +463,21 @@ export function AssetReferenceModal({
                       onClick={() => handleAssetToggle(asset)}
                     >
                       <Tooltip
-                        title={asset.displayValue || 'Untitled'}
+                        title={asset.displayValue}
                         zIndex={2100}
                         getPopupContainer={() => document.body}
                       >
                         <Avatar
                           size={28}
                           style={{
-                            backgroundColor: getAvatarColor(asset.id, asset.displayValue || 'Untitled'),
+                            backgroundColor: getAvatarColor(asset.id, asset.displayValue),
                             flexShrink: 0,
                           }}
                         >
-                          {getAvatarText(asset.displayValue || 'Untitled')}
+                          {getAvatarText(asset.displayValue)}
                         </Avatar>
                       </Tooltip>
-                      <span className={styles.assetListLabel}>{asset.displayValue || 'Untitled'}</span>
+                      <span className={styles.assetListLabel}>{asset.displayValue}</span>
                       {selectedAssetIdsForCurrentColumn.includes(asset.id) ? (
                         <span className={styles.assetListCheck}>✓</span>
                       ) : null}

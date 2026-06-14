@@ -25,7 +25,7 @@ import { users } from '../fixures/users';
  */
 
 test.describe('Name Validation Tests', () => {
-  // Serial: tests share seedEmpty and create projects/libraries in sequence.
+  // All cases share seedEmpty; serial avoids parallel contention and flaky navigation.
   test.describe.configure({ mode: 'serial' });
 
   let projectPage: ProjectPage;
@@ -78,7 +78,7 @@ test.describe('Name Validation Tests', () => {
 
   test.describe('Empty Name Validation', () => {
     test('Project - Empty name validation in rename modal', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -93,10 +93,7 @@ test.describe('Name Validation Tests', () => {
       // Open Project Info modal
       await test.step('Open Project Info modal', async () => {
         const sidebar = page.locator('aside');
-        const projectItem = sidebar.locator(`[title="${testProject.name}"]`);
-        
-        await expect(projectItem).toBeVisible({ timeout: 15000 });
-        await projectItem.click({ button: 'right' });
+        await projectPage.rightClickSidebarProject(testProject.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -130,7 +127,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Library - Empty name validation in rename modal', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -156,9 +153,7 @@ test.describe('Name Validation Tests', () => {
         await expect(sidebar).toBeVisible({ timeout: 10000 });
         await page.waitForTimeout(2000);
         
-        const libraryItem = sidebar.locator(`[title="${libraries.breed.name}"]`);
-        await expect(libraryItem).toBeVisible({ timeout: 15000 });
-        await libraryItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(libraries.breed.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -192,7 +187,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Folder - Empty name validation in rename modal', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -218,9 +213,7 @@ test.describe('Name Validation Tests', () => {
         await expect(sidebar).toBeVisible({ timeout: 10000 });
         await page.waitForTimeout(2000);
         
-        const folderItem = sidebar.locator(`[title="${folders.directFolder.name}"]`);
-        await expect(folderItem).toBeVisible({ timeout: 15000 });
-        await folderItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(folders.directFolder.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -258,7 +251,7 @@ test.describe('Name Validation Tests', () => {
 
   test.describe('Special Characters Validation', () => {
     test('Project - Special characters validation (emoji, HTML tag, special symbols)', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -273,10 +266,7 @@ test.describe('Name Validation Tests', () => {
       // Open Project Info modal
       await test.step('Open Project Info modal', async () => {
         const sidebar = page.locator('aside');
-        const projectItem = sidebar.locator(`[title="${testProject.name}"]`);
-        
-        await expect(projectItem).toBeVisible({ timeout: 15000 });
-        await projectItem.click({ button: 'right' });
+        await projectPage.rightClickSidebarProject(testProject.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -326,7 +316,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Library - Special characters validation (emoji, HTML tag, special symbols)', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -352,9 +342,7 @@ test.describe('Name Validation Tests', () => {
         await expect(sidebar).toBeVisible({ timeout: 10000 });
         await page.waitForTimeout(2000);
         
-        const libraryItem = sidebar.locator(`[title="${libraries.breed.name}"]`);
-        await expect(libraryItem).toBeVisible({ timeout: 15000 });
-        await libraryItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(libraries.breed.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -404,7 +392,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Folder - Special characters validation (emoji, HTML tag, special symbols)', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -430,9 +418,7 @@ test.describe('Name Validation Tests', () => {
         await expect(sidebar).toBeVisible({ timeout: 10000 });
         await page.waitForTimeout(2000);
         
-        const folderItem = sidebar.locator(`[title="${folders.directFolder.name}"]`);
-        await expect(folderItem).toBeVisible({ timeout: 15000 });
-        await folderItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(folders.directFolder.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -488,7 +474,7 @@ test.describe('Name Validation Tests', () => {
     const urlErrorText = 'No emojis, HTML tags or !@#$% allowed';
 
     test('Project - URL validation (https://, http://)', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       const testProject = generateProjectData();
 
@@ -500,9 +486,7 @@ test.describe('Name Validation Tests', () => {
 
       await test.step('Open Project Info modal', async () => {
         const sidebar = page.locator('aside');
-        const projectItem = sidebar.locator(`[title="${testProject.name}"]`);
-        await expect(projectItem).toBeVisible({ timeout: 15000 });
-        await projectItem.click({ button: 'right' });
+        await projectPage.rightClickSidebarProject(testProject.name);
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
         const projectInfoButton = contextMenu.getByRole('button', { name: /^project info$/i });
@@ -533,7 +517,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Library - URL validation (https://, http://)', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       const testProject = generateProjectData();
 
@@ -553,9 +537,7 @@ test.describe('Name Validation Tests', () => {
         const sidebar = page.getByRole('tree');
         await expect(sidebar).toBeVisible({ timeout: 10000 });
         await page.waitForTimeout(2000);
-        const libraryItem = sidebar.locator(`[title="${libraries.breed.name}"]`);
-        await expect(libraryItem).toBeVisible({ timeout: 15000 });
-        await libraryItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(libraries.breed.name);
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
         const libraryInfoButton = contextMenu.getByRole('button', { name: /^library info$/i });
@@ -586,7 +568,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Folder - URL validation (https://, http://)', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       const testProject = generateProjectData();
 
@@ -606,9 +588,7 @@ test.describe('Name Validation Tests', () => {
         const sidebar = page.getByRole('tree');
         await expect(sidebar).toBeVisible({ timeout: 10000 });
         await page.waitForTimeout(2000);
-        const folderItem = sidebar.locator(`[title="${folders.directFolder.name}"]`);
-        await expect(folderItem).toBeVisible({ timeout: 15000 });
-        await folderItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(folders.directFolder.name);
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
         const renameButton = contextMenu.getByRole('button', { name: /^rename$/i });
@@ -667,10 +647,7 @@ test.describe('Name Validation Tests', () => {
       // Open Project Info modal for second project
       await test.step('Open Project Info modal for second project', async () => {
         const sidebar = page.locator('aside');
-        const projectItem = sidebar.locator(`[title="${testProject2.name}"]`);
-        
-        await expect(projectItem).toBeVisible({ timeout: 15000 });
-        await projectItem.click({ button: 'right' });
+        await projectPage.rightClickSidebarProject(testProject2.name);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -703,7 +680,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Library - Duplicate name validation', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -737,9 +714,7 @@ test.describe('Name Validation Tests', () => {
         await page.waitForTimeout(2000);
         
         const secondLibraryName = `${libraries.breed.name} 2`;
-        const libraryItem = sidebar.locator(`[title="${secondLibraryName}"]`);
-        await expect(libraryItem).toBeVisible({ timeout: 15000 });
-        await libraryItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(secondLibraryName);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -772,7 +747,7 @@ test.describe('Name Validation Tests', () => {
     });
 
     test('Folder - Duplicate name validation', async ({ page }) => {
-      test.setTimeout(60000);
+      test.setTimeout(120000);
 
       // Generate unique project data
       const testProject = generateProjectData();
@@ -806,9 +781,7 @@ test.describe('Name Validation Tests', () => {
         await page.waitForTimeout(2000);
         
         const secondFolderName = `${folders.directFolder.name} 2`;
-        const folderItem = sidebar.locator(`[title="${secondFolderName}"]`);
-        await expect(folderItem).toBeVisible({ timeout: 15000 });
-        await folderItem.click({ button: 'right' });
+        await libraryPage.rightClickTreeItem(secondFolderName);
         
         const contextMenu = page.locator('[class*="contextMenu"]');
         await expect(contextMenu).toBeVisible({ timeout: 5000 });

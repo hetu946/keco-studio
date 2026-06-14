@@ -99,7 +99,7 @@ export async function loadConversationHistory(
 }
 
 /**
- * DeepSeek/OpenAI require every assistant message with tool_calls to be
+ * LLM providers (MiniMax, OpenAI-compatible) require every assistant message with tool_calls to be
  * immediately followed by a tool message per tool_call_id. Repair gaps left by
  * interrupted confirmation flows or partial DB writes.
  */
@@ -202,6 +202,8 @@ export async function updateConversationMeta(
 
 export interface ConversationListItem {
   id: string;
+  projectId: string;
+  projectName: string;
   meta: ConversationMeta;
   title: string | null;
   lastMessage?: string;
@@ -216,19 +218,44 @@ export async function listConversations(
 ): Promise<ConversationListItem[]> {
   const { data, error } = await supabase
     .from('agent_conversations')
-    .select('id, meta, title, created_at, updated_at')
+    .select('id, meta, title, created_at, updated_at, project_id, projects(name)')
     .eq('project_id', projectId)
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
   if (error || !data) return [];
 
-  return data.map((row) => ({
-    id: row.id,
+  return data.map((row) => mapConversationListRow(row));
+}
+
+export async function listAllConversations(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ConversationListItem[]> {
+  const { data, error } = await supabase
+    .from('agent_conversations')
+    .select('id, meta, title, created_at, updated_at, project_id, projects(name)')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false });
+  if (error || !data) return [];
+
+  return data.map((row) => mapConversationListRow(row));
+}
+
+function mapConversationListRow(row: Record<string, unknown>): ConversationListItem {
+  const projects = row.projects as { name?: string } | { name?: string }[] | null | undefined;
+  const projectName = Array.isArray(projects)
+    ? (projects[0]?.name ?? 'Unknown project')
+    : (projects?.name ?? 'Unknown project');
+
+  return {
+    id: row.id as string,
+    projectId: row.project_id as string,
+    projectName,
     meta: (row.meta ?? {}) as ConversationMeta,
-    title: row.title ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+    title: (row.title as string | null) ?? null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
 }
 
 export async function deleteConversation(

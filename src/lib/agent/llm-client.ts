@@ -1,16 +1,18 @@
 /**
- * DeepSeek streaming client (OpenAI-compatible Chat Completions API).
+ * LLM streaming client (OpenAI-compatible Chat Completions API).
  *
+ * Currently configured for MiniMax M2.7 (thinking model).
  * Parses the upstream SSE stream and re-yields normalized StreamChunk values.
  * Includes a single automatic retry with exponential backoff on transient
  * network / 5xx / 429 errors before the first chunk is read.
  */
 
 import type { ChatMessage, OpenAITool, StreamChunk } from './types';
+import { ThinkTagParser } from './think-tag-parser';
 
-const DEEPSEEK_BASE = (process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const LLM_BASE = (process.env.LLM_API_URL || 'https://api.minimax.io').replace(/\/+$/, '');
+const LLM_API_KEY = process.env.LLM_API_KEY || '';
+const LLM_MODEL = process.env.LLM_MODEL || 'MiniMax-M2.7';
 
 export class LlmError extends Error {
   constructor(message: string) {
@@ -32,12 +34,12 @@ async function requestStream(
   messages: ChatMessage[],
   options: StreamLlmOptions
 ): Promise<Response> {
-  if (!DEEPSEEK_API_KEY) {
-    throw new LlmError('DEEPSEEK_API_KEY is not configured.');
+  if (!LLM_API_KEY) {
+    throw new LlmError('LLM_API_KEY is not configured.');
   }
 
   const body: Record<string, unknown> = {
-    model: DEEPSEEK_MODEL,
+    model: LLM_MODEL,
     messages,
     temperature: options.temperature ?? 0.3,
     max_tokens: options.maxTokens ?? 4096,
@@ -50,11 +52,11 @@ async function requestStream(
     body.parallel_tool_calls = false;
   }
 
-  return fetch(`${DEEPSEEK_BASE}/v1/chat/completions`, {
+  return fetch(`${LLM_BASE}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      Authorization: `Bearer ${LLM_API_KEY}`,
     },
     body: JSON.stringify(body),
     signal: options.signal,
@@ -62,7 +64,7 @@ async function requestStream(
 }
 
 /**
- * Stream a chat completion from DeepSeek, yielding normalized chunks.
+ * Stream a chat completion from the LLM, yielding normalized chunks.
  */
 export async function* streamLlm(
   messages: ChatMessage[],
@@ -80,9 +82,9 @@ export async function* streamLlm(
       const retriable = response.status >= 500 || response.status === 429;
       if (!retriable || attempt === 1) {
         const text = await response.text().catch(() => '');
-        throw new LlmError(`DeepSeek request failed (${response.status}): ${text.slice(0, 500)}`);
+        throw new LlmError(`LLM request failed (${response.status}): ${text.slice(0, 500)}`);
       }
-      lastError = new LlmError(`DeepSeek transient error (${response.status})`);
+      lastError = new LlmError(`LLM transient error (${response.status})`);
     } catch (err) {
       if (err instanceof LlmError && !`${err.message}`.includes('transient')) {
         // Non-retriable application error — rethrow immediately.
@@ -95,12 +97,13 @@ export async function* streamLlm(
   }
 
   if (!response || !response.body) {
-    throw lastError instanceof Error ? lastError : new LlmError('DeepSeek stream unavailable.');
+    throw lastError instanceof Error ? lastError : new LlmError('LLM stream unavailable.');
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  const thinkParser = new ThinkTagParser();
 
   try {
     while (true) {
@@ -118,7 +121,7 @@ export async function* streamLlm(
         const payload = rawLine.slice('data:'.length).trim();
         if (payload === '[DONE]') return;
 
-        let parsed: DeepSeekChunk;
+        let parsed: LlmChunk;
         try {
           parsed = JSON.parse(payload);
         } catch {
@@ -129,8 +132,18 @@ export async function* streamLlm(
         if (!choice) continue;
         const delta = choice.delta;
 
+        if (delta?.reasoning_content) {
+          yield { type: 'reasoning_delta', content: delta.reasoning_content };
+        }
+
         if (delta?.content) {
-          yield { type: 'text_delta', content: delta.content };
+          for (const piece of thinkParser.feed(delta.content)) {
+            if (piece.kind === 'reasoning') {
+              yield { type: 'reasoning_delta', content: piece.content };
+            } else {
+              yield { type: 'text_delta', content: piece.content };
+            }
+          }
         }
 
         if (delta?.tool_calls) {
@@ -174,10 +187,11 @@ export async function completeLlm(
   return text;
 }
 
-interface DeepSeekChunk {
+interface LlmChunk {
   choices?: Array<{
     delta?: {
       content?: string;
+      reasoning_content?: string;
       tool_calls?: Array<{
         index?: number;
         id?: string;

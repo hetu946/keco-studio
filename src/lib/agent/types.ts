@@ -19,7 +19,7 @@ export type UserRole = 'admin' | 'editor' | 'viewer';
  */
 export type ConfirmationMode = 'pre_execute' | 'post_preview' | 'meta';
 
-export type DisplayHint = 'table' | 'text' | 'list' | 'script_preview';
+export type DisplayHint = 'table' | 'text' | 'list' | 'script_preview' | 'skill_preview';
 
 /** Loose JSON Schema type — we only forward this to the LLM verbatim. */
 export type JSONSchema = Record<string, unknown>;
@@ -69,7 +69,7 @@ export interface ConversationMeta {
 }
 
 /**
- * OpenAI-compatible chat message used to talk to DeepSeek and persisted (the
+ * OpenAI-compatible chat message used to talk to the LLM and persisted (the
  * text/tool parts) in agent_messages.content.
  */
 export interface ChatMessage {
@@ -104,15 +104,17 @@ export interface TokenUsage {
   total_tokens?: number;
 }
 
-/** Chunks yielded by the DeepSeek streaming client. */
+/** Chunks yielded by the LLM streaming client. */
 export type StreamChunk =
   | { type: 'text_delta'; content: string }
+  | { type: 'reasoning_delta'; content: string }
   | { type: 'tool_call_delta'; index: number; id?: string; name?: string; arguments?: string }
   | { type: 'finish'; reason: 'stop' | 'tool_calls' | 'length' | string; usage?: TokenUsage };
 
 /** Events streamed over SSE to the ChatPanel. Mirrors §5 of the spec. */
 export type SSEEvent =
   | { type: 'text_delta'; content: string }
+  | { type: 'reasoning_delta'; content: string }
   | { type: 'tool_call_start'; tool: string; args: string }
   | { type: 'tool_call_end' }
   | { type: 'tool_result'; tool: string; data: unknown; displayHint?: DisplayHint }

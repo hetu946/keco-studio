@@ -4,9 +4,19 @@
 
 import { z } from 'zod';
 import { createAsset as createAssetService } from '@/lib/services/libraryAssetsService';
+import {
+  resolveAgentReferencePropertyValues,
+  validateReferencePropertyValues,
+} from '../asset-emptiness';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
 import { resolvePropertyValues } from '../field-resolver';
-import { findLibraryByName } from './_shared';
+import {
+  errorFromLookupResult,
+  errorFromOkResult,
+  getLibraryProperties,
+  libraryFromLookupResult,
+  resolveLibraryForTool,
+} from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
@@ -28,19 +38,17 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
-  const { library, available } = await findLibraryByName(ctx.supabase, ctx.projectId, libraryName);
-  if (!library) {
-    return {
-      success: false,
-      error: `Library "${libraryName}" not found. Available libraries: ${available.join(', ') || '(none)'}`,
-    };
+  const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
+  const library = libraryFromLookupResult(libraryResult);
 
-  const { resolved, unresolved, availableFields } = await resolvePropertyValues(
-    ctx.supabase,
-    library.id,
-    propertyValues
-  );
+  const [properties, { resolved, unresolved, availableFields }] = await Promise.all([
+    getLibraryProperties(ctx.supabase, library.id),
+    resolvePropertyValues(ctx.supabase, library.id, propertyValues),
+  ]);
   if (unresolved.length > 0) {
     return {
       success: false,
@@ -48,8 +56,29 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
+  let resolvedWithReferences: Record<string, unknown>;
   try {
-    const assetId = await createAssetService(ctx.supabase, library.id, name, resolved);
+    resolvedWithReferences = await resolveAgentReferencePropertyValues(
+      ctx.supabase,
+      properties,
+      resolved
+    );
+  } catch (e) {
+    return { success: false, error: (e as Error).message || 'Failed to resolve reference values.' };
+  }
+
+  const referenceValidation = await validateReferencePropertyValues(
+    ctx.supabase,
+    properties,
+    resolvedWithReferences
+  );
+  const referenceError = errorFromOkResult(referenceValidation);
+  if (referenceError !== undefined) {
+    return { success: false, error: referenceError };
+  }
+
+  try {
+    const assetId = await createAssetService(ctx.supabase, library.id, name, resolvedWithReferences);
     return {
       success: true,
       displayHint: 'text',
@@ -64,7 +93,7 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
 export const createAsset: AgentTool = {
   name: 'create_asset',
   description:
-    'Add a new asset (row) to a library. Use semantic field names in propertyValues (e.g. {"类型": "character"}). libraryName defaults to the user\'s active library from page context when omitted. Params: name (required), libraryName (optional), propertyValues.',
+    'Add a new asset (row) to a library. Use semantic field names in propertyValues (e.g. {"类型": "character"}). Reference fields cannot target empty assets. libraryName defaults to the user\'s active library from page context when omitted. Params: name (required), libraryName (optional), propertyValues.',
   category: 'write',
   confirmationMode: 'pre_execute',
   requiredPermission: 'editor',

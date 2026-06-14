@@ -144,6 +144,8 @@ async function* continueLoop(
       if (chunk.type === 'text_delta') {
         assistantContent += chunk.content;
         yield { type: 'text_delta', content: chunk.content };
+      } else if (chunk.type === 'reasoning_delta') {
+        yield { type: 'reasoning_delta', content: chunk.content };
       } else if (chunk.type === 'tool_call_delta') {
         const existing = toolCallsByIndex.get(chunk.index);
         if (existing) {

@@ -1,9 +1,14 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/lib/SupabaseContext';
 import { getActiveSectionName } from '@/lib/agent/page-context';
+import {
+  clearLastConversation,
+  setLastConversation,
+} from './agentChatStorage';
+import { mapHistoryMessagesToChatItems } from './historyMessageMapper';
 import type { ChatItem, SendContext } from './types';
 
 let idCounter = 0;
@@ -27,11 +32,26 @@ export function useAgentChat(ctx: SendContext) {
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
+  const streamingAssistantIdRef = useRef<string | null>(null);
+  const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(null);
+  const projectIdRef = useRef(ctx.projectId);
 
-  const setConv = (id: string | undefined) => {
-    conversationIdRef.current = id;
-    setConversationId(id);
-  };
+  const persistLastConversation = useCallback(
+    (id: string | undefined) => {
+      if (!ctx.userId || !ctx.projectId || !id) return;
+      setLastConversation(ctx.userId, ctx.projectId, id);
+    },
+    [ctx.userId, ctx.projectId]
+  );
+
+  const setConv = useCallback(
+    (id: string | undefined, options?: { persist?: boolean }) => {
+      conversationIdRef.current = id;
+      setConversationId(id);
+      if (id && options?.persist !== false) persistLastConversation(id);
+    },
+    [persistLastConversation]
+  );
 
   const appendItem = useCallback((item: ChatItem) => {
     setItems((prev) => [...prev, item]);
@@ -54,7 +74,6 @@ export function useAgentChat(ctx: SendContext) {
       } catch {
         // best-effort
       }
-      // Let any open library page reload its data, then refresh server components.
       window.dispatchEvent(new CustomEvent('agent:data-updated', { detail: { paths } }));
       router.refresh();
     },
@@ -79,26 +98,57 @@ export function useAgentChat(ctx: SendContext) {
       const decoder = new TextDecoder();
       let buffer = '';
 
-      // Track the active assistant text bubble and the active tool-call card.
       let assistantId: string | null = null;
       let toolCallId: string | null = null;
 
+      const ensureAssistantBubble = () => {
+        if (!assistantId) {
+          assistantId = nextId();
+          streamingAssistantIdRef.current = assistantId;
+          setStreamingAssistantId(assistantId);
+          appendItem({ id: assistantId, role: 'assistant' });
+        }
+        return assistantId;
+      };
+
       const handleEvent = (event: ParsedSSE) => {
         switch (event.type) {
+          case 'reasoning_delta': {
+            const delta = String(event.content ?? '');
+            const id = ensureAssistantBubble();
+            const now = Date.now();
+            setItems((prev) =>
+              prev.map((it) => {
+                if (it.id !== id) return it;
+                return {
+                  ...it,
+                  reasoning: (it.reasoning ?? '') + delta,
+                  reasoningStartedAt: it.reasoningStartedAt ?? now,
+                };
+              })
+            );
+            break;
+          }
           case 'text_delta': {
             const delta = String(event.content ?? '');
-            if (!assistantId) {
-              assistantId = nextId();
-              appendItem({ id: assistantId, role: 'assistant', text: delta });
-            } else {
-              setItems((prev) =>
-                prev.map((it) => (it.id === assistantId ? { ...it, text: (it.text ?? '') + delta } : it))
-              );
-            }
+            const id = ensureAssistantBubble();
+            const now = Date.now();
+            setItems((prev) =>
+              prev.map((it) => {
+                if (it.id !== id) return it;
+                const patch: Partial<ChatItem> = { text: (it.text ?? '') + delta };
+                if (it.reasoning && !it.reasoningEndedAt) {
+                  patch.reasoningEndedAt = now;
+                }
+                return { ...it, ...patch };
+              })
+            );
             break;
           }
           case 'tool_call_start': {
             assistantId = null;
+            streamingAssistantIdRef.current = null;
+            setStreamingAssistantId(null);
             toolCallId = nextId();
             appendItem({
               id: toolCallId,
@@ -125,6 +175,8 @@ export function useAgentChat(ctx: SendContext) {
           }
           case 'confirmation_request': {
             assistantId = null;
+            streamingAssistantIdRef.current = null;
+            setStreamingAssistantId(null);
             appendItem({
               id: nextId(),
               role: 'confirmation',
@@ -145,6 +197,8 @@ export function useAgentChat(ctx: SendContext) {
           }
           case 'error': {
             assistantId = null;
+            streamingAssistantIdRef.current = null;
+            setStreamingAssistantId(null);
             appendItem({ id: nextId(), role: 'error', error: String(event.message ?? 'Unknown error') });
             break;
           }
@@ -153,6 +207,23 @@ export function useAgentChat(ctx: SendContext) {
           default:
             break;
         }
+      };
+
+      const finalizeStreamingAssistant = () => {
+        const id = streamingAssistantIdRef.current;
+        if (!id) return;
+        const now = Date.now();
+        setItems((prev) =>
+          prev.map((it) => {
+            if (it.id !== id || !it.reasoning) return it;
+            const patch: Partial<ChatItem> = {};
+            if (!it.reasoningStartedAt) patch.reasoningStartedAt = now;
+            if (!it.reasoningEndedAt) patch.reasoningEndedAt = now;
+            return Object.keys(patch).length ? { ...it, ...patch } : it;
+          })
+        );
+        streamingAssistantIdRef.current = null;
+        setStreamingAssistantId(null);
       };
 
       while (true) {
@@ -172,8 +243,9 @@ export function useAgentChat(ctx: SendContext) {
           }
         }
       }
+      finalizeStreamingAssistant();
     },
-    [appendItem, updateItem, invalidateCaches]
+    [appendItem, updateItem, invalidateCaches, setConv]
   );
 
   const send = useCallback(
@@ -221,7 +293,6 @@ export function useAgentChat(ctx: SendContext) {
   const confirm = useCallback(
     async (actionId: string, decision: 'approve' | 'reject') => {
       if (isStreaming) return;
-      // Mark the confirmation card as resolved.
       setItems((prev) =>
         prev.map((it) =>
           it.confirmation?.actionId === actionId
@@ -266,17 +337,27 @@ export function useAgentChat(ctx: SendContext) {
     [isStreaming, getToken, ctx, consumeStream, appendItem]
   );
 
-  const startNewConversation = useCallback(() => {
+  const resetToEmpty = useCallback(() => {
     abortRef.current?.abort();
-    setConv(undefined);
+    conversationIdRef.current = undefined;
+    setConversationId(undefined);
     setItems([]);
     setIsStreaming(false);
+    streamingAssistantIdRef.current = null;
+    setStreamingAssistantId(null);
   }, []);
 
+  const startNewConversation = useCallback(() => {
+    resetToEmpty();
+    if (ctx.userId && ctx.projectId) {
+      clearLastConversation(ctx.userId, ctx.projectId);
+    }
+  }, [resetToEmpty, ctx.userId, ctx.projectId]);
+
   const loadConversation = useCallback(
-    async (id: string) => {
+    async (id: string, options?: { persist?: boolean }) => {
       abortRef.current?.abort();
-      setConv(id);
+      setConv(id, { persist: options?.persist });
       setItems([]);
       try {
         const token = await getToken();
@@ -284,50 +365,75 @@ export function useAgentChat(ctx: SendContext) {
           credentials: 'include',
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
-        if (!res.ok) return;
+        if (res.status === 404) {
+          if (ctx.userId && ctx.projectId) {
+            clearLastConversation(ctx.userId, ctx.projectId);
+          }
+          resetToEmpty();
+          return false;
+        }
+        if (!res.ok) return false;
         const { messages } = (await res.json()) as {
           messages: Array<{ id: string; role: string; content: Record<string, unknown> }>;
         };
-        const loaded: ChatItem[] = [];
-        for (const m of messages) {
-          const body = (m.content ?? {}) as Record<string, unknown>;
-          const text = typeof body.content === 'string' ? body.content : '';
-          if (m.role === 'user' && text) {
-            loaded.push({ id: m.id, role: 'user', text });
-          } else if (m.role === 'assistant' && text && !body.tool_calls) {
-            loaded.push({ id: m.id, role: 'assistant', text });
-          } else if (m.role === 'tool') {
-            // Show a compact tool result card from history.
-            let data: unknown;
-            try {
-              data = typeof text === 'string' ? JSON.parse(text) : text;
-            } catch {
-              data = text;
-            }
-            const toolName = Array.isArray(body.tool_calls) ? '' : '';
-            loaded.push({
-              id: m.id,
-              role: 'tool',
-              toolCall: { tool: toolName || 'tool', status: 'success', data },
-            });
-          }
+        setItems(mapHistoryMessagesToChatItems(messages));
+        if (options?.persist !== false && ctx.userId && ctx.projectId) {
+          setLastConversation(ctx.userId, ctx.projectId, id);
         }
-        setItems(loaded);
+        return true;
       } catch {
-        // ignore
+        return false;
       }
     },
-    [getToken]
+    [getToken, setConv, ctx.userId, ctx.projectId, resetToEmpty]
+  );
+
+  const restoreProjectConversation = useCallback(async () => {
+    if (!ctx.userId || !ctx.projectId) {
+      resetToEmpty();
+      return;
+    }
+    const { getLastConversationMap } = await import('./agentChatStorage');
+    const map = getLastConversationMap(ctx.userId);
+    const savedId = map[ctx.projectId];
+    if (savedId) {
+      const ok = await loadConversation(savedId, { persist: false });
+      if (!ok) return;
+    } else {
+      resetToEmpty();
+    }
+  }, [ctx.userId, ctx.projectId, loadConversation, resetToEmpty]);
+
+  useEffect(() => {
+    if (projectIdRef.current === ctx.projectId) return;
+    projectIdRef.current = ctx.projectId;
+    void restoreProjectConversation();
+  }, [ctx.projectId, restoreProjectConversation]);
+
+  useEffect(() => {
+    if (!ctx.userId || !ctx.projectId) return;
+    void restoreProjectConversation();
+    // Only run when user becomes available on initial mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.userId]);
+
+  const appendNote = useCallback(
+    (text: string) => {
+      appendItem({ id: nextId(), role: 'assistant', text });
+    },
+    [appendItem]
   );
 
   return {
     items,
     isStreaming,
+    streamingAssistantId,
     conversationId,
     send,
     confirm,
     startNewConversation,
     loadConversation,
+    appendNote,
   };
 }
 

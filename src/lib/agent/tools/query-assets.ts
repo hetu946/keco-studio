@@ -3,18 +3,43 @@
  */
 
 import { z } from 'zod';
+import {
+  applyQueryAssetFilters,
+  buildNonEmptyCellEntries,
+  buildQueryAssetRows,
+  buildQueryAssetSummary,
+  buildReferenceTargetsFromAssets,
+  filterReferenceTargets,
+  sortQueryAssetRowsByRowIndex,
+} from '../asset-emptiness';
 import { getLibraryAssets } from '../data-access';
 import type { AgentTool, ToolContext, ToolResult } from '../types';
-import { buildFieldLabelMap, findLibraryByName, getLibraryProperties } from './_shared';
+import {
+  buildFieldLabelMap,
+  errorFromLookupResult,
+  getLibraryProperties,
+  libraryFromLookupResult,
+  resolveLibraryForTool,
+} from './_shared';
 
 const ParamsSchema = z.object({
   libraryName: z.string().min(1).optional(),
   nameFilter: z.string().optional(),
   type: z.string().optional(),
   limit: z.number().int().positive().max(200).optional(),
+  includeEmpty: z.boolean().optional().default(false),
+  rowIndex: z.number().int().positive().optional(),
 });
 
 const TYPE_FIELD_LABELS = ['类型', 'type', 'Type'];
+
+function invertLabelMap(labelMap: Record<string, string>): Record<string, string> {
+  const inverted: Record<string, string> = {};
+  for (const [fieldId, label] of Object.entries(labelMap)) {
+    inverted[label] = fieldId;
+  }
+  return inverted;
+}
 
 async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
   const parsed = ParamsSchema.safeParse(params);
@@ -22,7 +47,7 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     return { success: false, error: `Invalid parameters: ${parsed.error.message}` };
   }
   const libraryName = parsed.data.libraryName ?? ctx.currentLibraryName;
-  const { nameFilter, type, limit } = parsed.data;
+  const { nameFilter, type, limit, includeEmpty, rowIndex } = parsed.data;
   if (!libraryName) {
     return {
       success: false,
@@ -30,41 +55,46 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
     };
   }
 
-  const { library, available } = await findLibraryByName(ctx.supabase, ctx.projectId, libraryName);
-  if (!library) {
-    return {
-      success: false,
-      error: `Library "${libraryName}" not found. Available libraries: ${available.join(', ') || '(none)'}`,
-    };
+  const libraryResult = await resolveLibraryForTool(ctx.supabase, ctx.projectId, libraryName, ctx);
+  const libraryLookupError = errorFromLookupResult(libraryResult);
+  if (libraryLookupError !== undefined) {
+    return { success: false, error: libraryLookupError };
   }
+  const library = libraryFromLookupResult(libraryResult);
 
   const properties = await getLibraryProperties(ctx.supabase, library.id);
   const labelMap = buildFieldLabelMap(properties);
+  const labelToFieldId = invertLabelMap(labelMap);
   const assets = await getLibraryAssets(ctx.supabase, library.id);
 
   const typeFieldId = properties.find((p) => TYPE_FIELD_LABELS.includes(p.name))?.key;
+  const typeFieldLabel = typeFieldId ? labelMap[typeFieldId] : undefined;
+  const orderedFieldIds = properties.map((p) => p.key);
 
-  let rows = assets.map((asset) => {
-    const values: Record<string, unknown> = {};
-    for (const [fieldId, value] of Object.entries(asset.propertyValues ?? {})) {
-      const label = labelMap[fieldId] ?? fieldId;
-      values[label] = value;
-    }
-    return { id: asset.id, name: asset.name, values };
-  });
-
-  if (nameFilter) {
-    const needle = nameFilter.trim().toLowerCase();
-    rows = rows.filter((r) => r.name.toLowerCase().includes(needle));
-  }
-  if (type && typeFieldId) {
-    const typeLabel = labelMap[typeFieldId];
-    const needle = type.trim().toLowerCase();
-    rows = rows.filter((r) => String(r.values[typeLabel] ?? '').toLowerCase().includes(needle));
-  }
-  if (limit) {
-    rows = rows.slice(0, limit);
-  }
+  const effectiveIncludeEmpty = rowIndex !== undefined ? true : includeEmpty;
+  const allRows = buildQueryAssetRows(assets, labelMap, orderedFieldIds);
+  const rows = sortQueryAssetRowsByRowIndex(
+    applyQueryAssetFilters(allRows, {
+      includeEmpty: effectiveIncludeEmpty,
+      rowIndex,
+      nameFilter,
+      type,
+      typeFieldLabel,
+      limit,
+    })
+  );
+  const summary = buildQueryAssetSummary(allRows, rows, {
+    includeEmpty: effectiveIncludeEmpty,
+    rowIndex,
+  }, labelToFieldId);
+  const nonEmptyCells = buildNonEmptyCellEntries(
+    allRows.filter((row) => !row.isEmpty),
+    labelToFieldId
+  );
+  const referenceTargets = filterReferenceTargets(
+    buildReferenceTargetsFromAssets(assets, properties.map((p) => ({ key: p.key, name: p.name }))),
+    { rowIndex }
+  );
 
   return {
     success: true,
@@ -73,8 +103,12 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
       libraryId: library.id,
       libraryName: library.name,
       columns: properties.map((p) => p.name),
+      summary,
       rowCount: rows.length,
       rows,
+      nonEmptyCells,
+      /** Use these (not row.id) when writing reference fields — one entry per filled cell. */
+      referenceTargets,
     },
   };
 }
@@ -82,7 +116,7 @@ async function execute(params: unknown, ctx: ToolContext): Promise<ToolResult> {
 export const queryAssets: AgentTool = {
   name: 'query_assets',
   description:
-    'Query library assets by name, type, or tag. libraryName defaults to the active library from page context when omitted. Params: libraryName (optional), nameFilter, type, limit.',
+    'Query library assets. For reference writes use referenceTargets (assetId+fieldId per cell), NOT row.id. summary.nonEmptyCellCount equals referenceTargets.length. Each row may have multiple cells across sections. Params: libraryName, rowIndex, includeEmpty, nameFilter, type, limit.',
   category: 'read',
   confirmationMode: 'pre_execute', // unused for read tools
   parameters: {
@@ -92,9 +126,19 @@ export const queryAssets: AgentTool = {
         type: 'string',
         description: 'Name of the library to query. Omit to use the active library from page context.',
       },
+      rowIndex: {
+        type: 'number',
+        description:
+          'Return only the asset at this UI row number (1 = first row in the table). Use when the user says "row 1" / "第一行".',
+      },
       nameFilter: { type: 'string', description: 'Optional substring filter on asset name' },
       type: { type: 'string', description: 'Optional value filter on the type field' },
       limit: { type: 'number', description: 'Max rows to return (default all, max 200)' },
+      includeEmpty: {
+        type: 'boolean',
+        description:
+          'Include rows with no visible cell data (default false). Not needed when rowIndex is set.',
+      },
     },
     required: [],
   },
